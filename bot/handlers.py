@@ -24,6 +24,7 @@ from src.signal_engine import generate_signal
 from src.risk_manager import calculate_trade
 from src.news import get_news, format_news_message
 from src.trading_hours import get_hours_message
+from src.calendar import get_calendar, format_calendar_message
 from bot.config import cfg
 
 logger = logging.getLogger(__name__)
@@ -130,7 +131,8 @@ async def cmd_start(message: Message):
     builder.button(text="📰 News",         callback_data="home:news")
     builder.button(text="📜 History",      callback_data="home:history")
     builder.button(text="⚙️ Settings",     callback_data="home:settings")
-    builder.button(text="🕐 Market Hours", callback_data="home:hours")
+    builder.button(text="🕐 Market Hours",     callback_data="home:hours")
+    builder.button(text="📅 Calendar",          callback_data="home:calendar")
     builder.adjust(2)
 
     admin_note = "\n\n👑 Admin: /users  /approve  /revoke  /broadcast" if is_owner else ""
@@ -205,10 +207,76 @@ async def cb_home(callback: CallbackQuery):
     elif action == "hours":
         await callback.message.answer(get_hours_message(), parse_mode="HTML")
 
+    elif action == "calendar":
+        await callback.message.answer("📅 Fetching calendar...", parse_mode="HTML")
+        loop = asyncio.get_running_loop()
+        events = await loop.run_in_executor(None, lambda: get_calendar(today_only=True))
+        builder = InlineKeyboardBuilder()
+        builder.button(text="📅 Full Week", callback_data="calendar:week")
+        await callback.message.answer(
+            format_calendar_message(events, today_only=True),
+            parse_mode="HTML",
+            reply_markup=builder.as_markup(),
+        )
+
+    elif action == "history":
+        await cmd_history(callback.message)
+
+    elif action == "performance":
+        await cmd_performance(callback.message)
+
 
 @router.message(Command("help"))
 async def cmd_help(message: Message):
     await cmd_start(message)
+
+
+# ── /calendar ────────────────────────────────────────────────────────────────
+
+@router.message(Command("calendar"))
+async def cmd_calendar(message: Message):
+    await _ensure_user(message)
+    if not await _check_access(message): return
+
+    parts = message.text.split()
+    week  = len(parts) > 1 and parts[1].lower() == "week"
+
+    await message.answer("📅 Fetching calendar...", parse_mode="HTML")
+    loop   = asyncio.get_running_loop()
+    events = await loop.run_in_executor(None, lambda: get_calendar(today_only=not week))
+
+    builder = InlineKeyboardBuilder()
+    if not week:
+        builder.button(text="📅 Full Week", callback_data="calendar:week")
+    else:
+        builder.button(text="📅 Today Only", callback_data="calendar:today")
+
+    await message.answer(
+        format_calendar_message(events, today_only=not week),
+        parse_mode="HTML",
+        reply_markup=builder.as_markup(),
+    )
+
+
+@router.callback_query(F.data.startswith("calendar:"))
+async def cb_calendar(callback: CallbackQuery):
+    mode     = callback.data.split(":")[1]
+    today_only = mode == "today"
+    await callback.answer("Fetching...")
+    loop   = asyncio.get_running_loop()
+    events = await loop.run_in_executor(None, lambda: get_calendar(today_only=today_only))
+
+    builder = InlineKeyboardBuilder()
+    if today_only:
+        builder.button(text="📅 Full Week", callback_data="calendar:week")
+    else:
+        builder.button(text="📅 Today Only", callback_data="calendar:today")
+
+    await callback.message.edit_text(
+        format_calendar_message(events, today_only=today_only),
+        parse_mode="HTML",
+        reply_markup=builder.as_markup(),
+    )
 
 
 # ── /hours ───────────────────────────────────────────────────────────────────

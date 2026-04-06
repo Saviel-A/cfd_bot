@@ -58,6 +58,42 @@ def _is_open(market: str, now: datetime) -> bool:
     return False
 
 
+# Map every symbol to its market type
+_SYMBOL_MARKET: dict[str, str] = {}
+
+_CATEGORY_MARKET = {
+    "Metals":        "forex",
+    "Energy":        "forex",
+    "Major Forex":   "forex",
+    "Minor Forex":   "forex",
+    "Crypto":        "crypto",
+    "US Indices":    "us",
+    "Stocks":        "us",
+    "EU Indices":    "eu",
+    "Asian Indices": "asia",
+}
+
+
+def _build_symbol_map():
+    """Lazily build symbol → market type from CATEGORIES."""
+    if _SYMBOL_MARKET:
+        return
+    from src.instruments import CATEGORIES
+    for cat, symbols in CATEGORIES.items():
+        mtype = _CATEGORY_MARKET.get(cat, "forex")
+        for s in symbols:
+            _SYMBOL_MARKET[s] = mtype
+
+
+def symbol_market_status(symbol: str) -> tuple[bool, str]:
+    """Return (is_open, label) for a symbol right now."""
+    _build_symbol_map()
+    mtype = _SYMBOL_MARKET.get(symbol.upper(), "forex")
+    open_ = _is_open(mtype, _now_utc())
+    label = "🟢 Market Open" if open_ else "🔴 Market Closed"
+    return open_, label
+
+
 def get_hours_message() -> str:
     now_utc = _now_utc()
     now_il  = datetime.now(IL)
