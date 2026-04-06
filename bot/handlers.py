@@ -437,10 +437,14 @@ async def cmd_alerts(message: Message):
             settings = await get_settings(session, message.from_user.id)
             icon = "🔔" if settings.alerts_enabled else "🔕"
             state = "ON" if settings.alerts_enabled else "OFF"
+            builder = InlineKeyboardBuilder()
+            builder.button(text="🔔 Turn On",  callback_data="set_alerts:on")
+            builder.button(text="🔕 Turn Off", callback_data="set_alerts:off")
+            builder.adjust(2)
             await message.answer(
-                f"{icon} <b>Alerts are {state}</b>\n\n"
-                "Use /alerts on or /alerts off to change.",
+                f"{icon} <b>Alerts are {state}</b>\n\nAuto-push signals to you when they fire.",
                 parse_mode="HTML",
+                reply_markup=builder.as_markup(),
             )
             return
         enabled = parts[1].lower() == "on"
@@ -448,6 +452,19 @@ async def cmd_alerts(message: Message):
 
     icon = "🔔" if enabled else "🔕"
     await message.answer(f"{icon} Alerts <b>{'enabled' if enabled else 'disabled'}</b>.", parse_mode="HTML")
+
+
+@router.callback_query(F.data.startswith("set_alerts:"))
+async def cb_set_alerts(callback: CallbackQuery):
+    enabled = callback.data.split(":")[1] == "on"
+    async with AsyncSessionLocal() as session:
+        await update_settings(session, callback.from_user.id, alerts_enabled=enabled)
+    icon = "🔔" if enabled else "🔕"
+    await callback.message.edit_text(
+        f"{icon} Alerts <b>{'enabled' if enabled else 'disabled'}</b>.",
+        parse_mode="HTML",
+    )
+    await callback.answer()
 
 
 # ── /settings ─────────────────────────────────────────────────────────────────
@@ -470,18 +487,28 @@ async def cmd_timeframe(message: Message):
     valid = ["1m", "5m", "15m", "30m", "1h", "4h", "1d"]
     parts = message.text.split()
     if len(parts) < 2 or parts[1].lower() not in valid:
+        builder = InlineKeyboardBuilder()
+        for tf in valid:
+            builder.button(text=tf, callback_data=f"set_tf:{tf}")
+        builder.adjust(4)
         await message.answer(
-            "⏱ <b>Change Timeframe</b>\n\n"
-            "Usage: <code>/timeframe INTERVAL</code>\n\n"
-            "Options:\n"
-            "<code>1m  5m  15m  30m  1h  4h  1d</code>\n\n"
-            "Recommended: <b>1h</b> or <b>4h</b>",
+            "⏱ <b>Change Timeframe</b>\n\nRecommended: <b>1h</b> or <b>4h</b>",
             parse_mode="HTML",
+            reply_markup=builder.as_markup(),
         )
         return
     async with AsyncSessionLocal() as session:
         await update_settings(session, message.from_user.id, timeframe=parts[1].lower())
     await message.answer(f"✅ Timeframe updated to <b>{parts[1].lower()}</b>.", parse_mode="HTML")
+
+
+@router.callback_query(F.data.startswith("set_tf:"))
+async def cb_set_timeframe(callback: CallbackQuery):
+    tf = callback.data.split(":")[1]
+    async with AsyncSessionLocal() as session:
+        await update_settings(session, callback.from_user.id, timeframe=tf)
+    await callback.message.edit_text(f"✅ Timeframe updated to <b>{tf}</b>.", parse_mode="HTML")
+    await callback.answer()
 
 
 # ── /confluence ───────────────────────────────────────────────────────────────
@@ -491,20 +518,29 @@ async def cmd_confluence(message: Message):
     await _ensure_user(message)
     parts = message.text.split()
     if len(parts) < 2 or not parts[1].isdigit() or not 1 <= int(parts[1]) <= 4:
+        builder = InlineKeyboardBuilder()
+        labels = {1: "1 — Very sensitive", 2: "2 — Loose", 3: "3 — Recommended", 4: "4 — Strict"}
+        for n, label in labels.items():
+            builder.button(text=label, callback_data=f"set_conf:{n}")
+        builder.adjust(1)
         await message.answer(
-            "🎯 <b>Signal Sensitivity</b>\n\n"
-            "Usage: <code>/confluence NUMBER</code>\n\n"
-            "How many indicators must agree before a signal fires:\n"
-            "<b>1</b> - Very sensitive (many signals)\n"
-            "<b>2</b> - Loose\n"
-            "<b>3</b> - Recommended\n"
-            "<b>4</b> - Strict (fewer, higher quality signals)",
+            "🎯 <b>Signal Sensitivity</b>\n\nHow many indicators must agree before a signal fires:",
             parse_mode="HTML",
+            reply_markup=builder.as_markup(),
         )
         return
     async with AsyncSessionLocal() as session:
         await update_settings(session, message.from_user.id, min_confluence=int(parts[1]))
     await message.answer(f"✅ Confluence updated to <b>{parts[1]} of 4</b>.", parse_mode="HTML")
+
+
+@router.callback_query(F.data.startswith("set_conf:"))
+async def cb_set_confluence(callback: CallbackQuery):
+    n = int(callback.data.split(":")[1])
+    async with AsyncSessionLocal() as session:
+        await update_settings(session, callback.from_user.id, min_confluence=n)
+    await callback.message.edit_text(f"✅ Confluence updated to <b>{n} of 4</b>.", parse_mode="HTML")
+    await callback.answer()
 
 
 # ── /balance ──────────────────────────────────────────────────────────────────
