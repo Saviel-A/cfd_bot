@@ -148,67 +148,116 @@ async def cmd_start(message: Message):
 
 @router.callback_query(F.data.startswith("home:"))
 async def cb_home(callback: CallbackQuery):
-    action = callback.data.split(":")[1]
+    action  = callback.data.split(":")[1]
+    user_id = callback.from_user.id
+    chat_id = callback.message.chat.id
+    bot     = callback.bot
     await callback.answer()
-    # Re-use existing handlers by faking a message-like object isn't clean —
-    # instead redirect by sending the appropriate command message
-    routes = {
-        "watchlist": cmd_watchlist,
-        "history":   cmd_history,
-        "settings":  cmd_settings,
-        "performance": cmd_performance,
-    }
-    if action in routes:
-        await routes[action](callback.message)
+
+    async def send(text, **kw):
+        await bot.send_message(chat_id, text, **kw)
+
+    # Check access for signal-related actions
+    protected = {"watchlist", "signal", "news", "history", "settings", "performance"}
+    if action in protected:
+        async with AsyncSessionLocal() as session:
+            allowed = await is_premium_or_owner(session, user_id, cfg.OWNER_CHAT_ID)
+        if not allowed:
+            builder = InlineKeyboardBuilder()
+            builder.button(text="🔑 Request Access", callback_data=f"request_access:{user_id}")
+            await send("🔒 <b>Access Required</b>\n\nTap below to request access.",
+                       parse_mode="HTML", reply_markup=builder.as_markup())
+            return
+
+    if action == "watchlist":
+        async with AsyncSessionLocal() as session:
+            watchlist = await get_watchlist(session, user_id)
+        if not watchlist:
+            builder = InlineKeyboardBuilder()
+            builder.button(text="🔎 Browse Instruments", callback_data="home:symbols")
+            await send("📋 <b>Your watchlist is empty.</b>", parse_mode="HTML", reply_markup=builder.as_markup())
+            return
+        await send("🔍 Scanning your watchlist...", parse_mode="HTML")
+        results = []
+        for symbol in watchlist:
+            try:
+                r = await _scan_symbol_for_user(symbol, user_id)
+                results.append(r)
+            except Exception as e:
+                results.append({"symbol": symbol, "error": str(e), "display_name": get_display_name(symbol), "signal": None})
+        builder = InlineKeyboardBuilder()
+        builder.button(text="🔄 Refresh", callback_data="refresh:watchlist")
+        builder.button(text="➕ Add Symbol", callback_data="home:symbols")
+        builder.adjust(2)
+        await send(format_watchlist_message(results), parse_mode="HTML", reply_markup=builder.as_markup())
+
+    elif action == "history":
+        async with AsyncSessionLocal() as session:
+            signals = await get_recent_signals(session, user_id, limit=10)
+        builder = InlineKeyboardBuilder()
+        builder.button(text="🏆 Performance", callback_data="home:performance")
+        await send(format_history_message(signals), parse_mode="HTML", reply_markup=builder.as_markup())
+
+    elif action == "performance":
+        async with AsyncSessionLocal() as session:
+            stats = await get_performance_stats(session, user_id)
+        builder = InlineKeyboardBuilder()
+        builder.button(text="📜 Signal History", callback_data="home:history")
+        await send(format_performance_message(stats), parse_mode="HTML", reply_markup=builder.as_markup())
+
+    elif action == "settings":
+        async with AsyncSessionLocal() as session:
+            s        = await get_settings(session, user_id)
+            watchlist = await get_watchlist(session, user_id)
+        builder = InlineKeyboardBuilder()
+        builder.button(text="🔔 Alerts",     callback_data="open_setting:alerts")
+        builder.button(text="⏱ Timeframe",  callback_data="open_setting:timeframe")
+        builder.button(text="🎯 Confluence", callback_data="open_setting:confluence")
+        builder.button(text="💰 Balance",    callback_data="open_setting:balance")
+        builder.button(text="⚡ Risk",       callback_data="open_setting:risk")
+        builder.adjust(2)
+        await send(format_settings_message(s, len(watchlist)), parse_mode="HTML", reply_markup=builder.as_markup())
+
     elif action == "signal":
         async with AsyncSessionLocal() as session:
-            watchlist = await get_watchlist(session, callback.from_user.id)
-        if not watchlist:
-            await callback.message.answer(
-                "📋 Your watchlist is empty.\n\nUse /add or /symbols to add instruments.",
-                parse_mode="HTML",
-            )
-            return
-        builder = _watchlist_symbol_buttons(watchlist, "scan_sym")
+            watchlist = await get_watchlist(session, user_id)
+        builder = InlineKeyboardBuilder()
+        if watchlist:
+            for s in watchlist:
+                builder.button(text=s, callback_data=f"scan_sym:{s}")
         builder.button(text="🔎 Browse Instruments", callback_data="home:symbols")
         builder.adjust(3)
-        await callback.message.answer(
-            "📊 <b>Get a Signal</b>\n\nChoose a symbol from your watchlist:",
-            parse_mode="HTML",
-            reply_markup=builder.as_markup(),
+        await send(
+            "📊 <b>Get a Signal</b>\n\n" + ("Choose from your watchlist:" if watchlist else "Your watchlist is empty. Browse instruments:"),
+            parse_mode="HTML", reply_markup=builder.as_markup(),
         )
+
     elif action == "news":
         async with AsyncSessionLocal() as session:
-            watchlist = await get_watchlist(session, callback.from_user.id)
-        if not watchlist:
-            await callback.message.answer(
-                "📋 Your watchlist is empty.\n\nUse /add or /symbols to add instruments.",
-                parse_mode="HTML",
-            )
-            return
-        builder = _watchlist_symbol_buttons(watchlist, "news_sym")
+            watchlist = await get_watchlist(session, user_id)
+        builder = InlineKeyboardBuilder()
+        if watchlist:
+            for s in watchlist:
+                builder.button(text=s, callback_data=f"news_sym:{s}")
+        builder.button(text="🔎 Browse Instruments", callback_data="home:symbols")
         builder.adjust(3)
-        await callback.message.answer(
-            "📰 <b>Latest News</b>\n\nChoose a symbol:",
-            parse_mode="HTML",
-            reply_markup=builder.as_markup(),
+        await send(
+            "📰 <b>Latest News</b>\n\n" + ("Choose a symbol:" if watchlist else "Your watchlist is empty:"),
+            parse_mode="HTML", reply_markup=builder.as_markup(),
         )
+
     elif action == "symbols":
         builder = InlineKeyboardBuilder()
         for category in CATEGORIES:
             builder.button(text=category, callback_data=f"cat:{category}")
         builder.adjust(2)
-        await callback.message.answer(
-            "🔎 <b>Instruments</b>\n\nSelect a category:",
-            parse_mode="HTML",
-            reply_markup=builder.as_markup(),
-        )
+        await send("🔎 <b>Instruments</b>\n\nSelect a category:", parse_mode="HTML", reply_markup=builder.as_markup())
 
     elif action == "hours":
-        await callback.message.answer(get_hours_message(), parse_mode="HTML")
+        await send(get_hours_message(), parse_mode="HTML")
 
     elif action == "calendar":
-        await callback.message.answer("📅 Fetching calendar...", parse_mode="HTML")
+        await send("📅 Fetching calendar...", parse_mode="HTML")
         loop = asyncio.get_running_loop()
         events = await loop.run_in_executor(None, lambda: get_calendar(today_only=True))
         builder = InlineKeyboardBuilder()
@@ -236,7 +285,6 @@ async def cmd_help(message: Message):
 @router.message(Command("calendar"))
 async def cmd_calendar(message: Message):
     await _ensure_user(message)
-    if not await _check_access(message): return
 
     parts = message.text.split()
     week  = len(parts) > 1 and parts[1].lower() == "week"
@@ -284,7 +332,6 @@ async def cb_calendar(callback: CallbackQuery):
 @router.message(Command("hours"))
 async def cmd_hours(message: Message):
     await _ensure_user(message)
-    if not await _check_access(message): return
     await message.answer(get_hours_message(), parse_mode="HTML")
 
 
