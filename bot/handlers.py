@@ -115,25 +115,21 @@ async def cmd_start(message: Message):
         return
 
     admin_section = (
-        "\n\n/users - list all members\n"
-        "/approve - grant access\n"
-        "/revoke - remove access\n"
-        "/broadcast - message all users"
+        "\n\n👑 <b>Admin</b>\n"
+        "/users  /approve  /revoke  /broadcast"
     ) if is_owner else ""
 
     await message.answer(
         "📡 <b>CFD Smart Signal Bot</b>\n\n"
-        "/signal - live signal for any symbol\n"
-        "/watchlist - your symbols and signals\n"
-        "/symbols - browse 80+ instruments\n"
-        "/add  /remove - manage watchlist\n\n"
-        "/news - latest news for a symbol\n"
-        "/history - your last 10 signals\n"
-        "/performance - win rate and stats\n\n"
-        "/alerts - turn auto alerts on or off\n"
-        "/timeframe - change scan timeframe\n"
-        "/confluence - signal sensitivity\n"
-        "/settings - view all your settings"
+        "📊 /signal — live signal for any symbol\n"
+        "📋 /watchlist — your symbols and signals\n"
+        "🔎 /symbols — browse 80+ instruments\n"
+        "➕ /add  ➖ /remove — manage watchlist\n\n"
+        "📰 /news — latest news for a symbol\n"
+        "📜 /history — your last 10 signals\n"
+        "🏆 /performance — win rate and stats\n\n"
+        "⚙️ /settings — view all your settings\n"
+        "🔔 /alerts  ⏱ /timeframe  🎯 /confluence"
         + admin_section,
         parse_mode="HTML",
     )
