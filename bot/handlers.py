@@ -43,20 +43,19 @@ async def _ensure_user(message: Message):
         )
 
 
+def _is_owner(user_id: int) -> bool:
+    return user_id == cfg.OWNER_CHAT_ID
+
+
 async def _check_access(message: Message) -> bool:
-    async with AsyncSessionLocal() as session:
-        allowed = await is_premium_or_owner(session, message.from_user.id, cfg.OWNER_CHAT_ID)
-    if not allowed:
-        builder = InlineKeyboardBuilder()
-        builder.button(text="🔑 Request Access", callback_data=f"request_access:{message.from_user.id}")
-        await message.answer(
-            "🔒 <b>Access Required</b>\n\n"
-            "This is a private signal bot.\n"
-            "Tap below to send an access request.",
-            parse_mode="HTML",
-            reply_markup=builder.as_markup(),
-        )
-    return allowed
+    if _is_owner(message.from_user.id):
+        return True
+    await message.answer(
+        "📡 <b>CFD Smart Signals</b>\n\n"
+        "Subscribe to our channel to receive trading signals.",
+        parse_mode="HTML",
+    )
+    return False
 
 
 async def _scan_symbol_for_user(symbol: str, user_id: int) -> dict:
@@ -109,18 +108,11 @@ async def cmd_start(message: Message):
     await _ensure_user(message)
     is_owner = message.from_user.id == cfg.OWNER_CHAT_ID
 
-    async with AsyncSessionLocal() as session:
-        allowed = await is_premium_or_owner(session, message.from_user.id, cfg.OWNER_CHAT_ID)
-
-    if not allowed:
-        builder = InlineKeyboardBuilder()
-        builder.button(text="🔑 Request Access", callback_data=f"request_access:{message.from_user.id}")
+    if not _is_owner(message.from_user.id):
         await message.answer(
-            "📡 <b>CFD Smart Signal Bot</b>\n\n"
-            "Multi-timeframe CFD signals with automatic SL and TP levels.\n\n"
-            "🔒 This is a private bot. Tap below to request access.",
+            "📡 <b>CFD Smart Signals</b>\n\n"
+            "Subscribe to our channel to receive trading signals.",
             parse_mode="HTML",
-            reply_markup=builder.as_markup(),
         )
         return
 
@@ -135,12 +127,9 @@ async def cmd_start(message: Message):
     builder.button(text="📅 Calendar",          callback_data="home:calendar")
     builder.adjust(2)
 
-    admin_note = "\n\n👑 Admin: /users  /approve  /revoke  /broadcast" if is_owner else ""
-
     await message.answer(
         "📡 <b>CFD Smart Signal Bot</b>\n\n"
-        "Multi-timeframe signals with automatic SL and 3 TP levels."
-        + admin_note,
+        "Multi-timeframe signals with automatic SL and 3 TP levels.",
         parse_mode="HTML",
         reply_markup=builder.as_markup(),
     )
@@ -157,17 +146,9 @@ async def cb_home(callback: CallbackQuery):
     async def send(text, **kw):
         await bot.send_message(chat_id, text, **kw)
 
-    # Check access for signal-related actions
-    protected = {"watchlist", "signal", "news", "history", "settings", "performance"}
-    if action in protected:
-        async with AsyncSessionLocal() as session:
-            allowed = await is_premium_or_owner(session, user_id, cfg.OWNER_CHAT_ID)
-        if not allowed:
-            builder = InlineKeyboardBuilder()
-            builder.button(text="🔑 Request Access", callback_data=f"request_access:{user_id}")
-            await send("🔒 <b>Access Required</b>\n\nTap below to request access.",
-                       parse_mode="HTML", reply_markup=builder.as_markup())
-            return
+    if not _is_owner(user_id):
+        await send("📡 <b>CFD Smart Signals</b>\n\nSubscribe to our channel to receive trading signals.", parse_mode="HTML")
+        return
 
     if action == "watchlist":
         async with AsyncSessionLocal() as session:
