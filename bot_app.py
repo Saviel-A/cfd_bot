@@ -55,9 +55,6 @@ async def main():
         BotCommand(command="help",        description="Show all commands"),
     ])
 
-    asyncio.create_task(run_scan_loop(bot, cfg.SCAN_INTERVAL_MINUTES))
-    asyncio.create_task(run_outcome_tracker(bot))
-
     logger.info(f"Bot started | Owner: {cfg.OWNER_CHAT_ID} | Scan: {cfg.SCAN_INTERVAL_MINUTES}m")
     try:
         await bot.send_message(
@@ -68,6 +65,9 @@ async def main():
         )
     except Exception as e:
         logger.warning(f"Could not send startup message: {e} — send /start to the bot first.")
+
+    asyncio.create_task(run_scan_loop(bot, cfg.SCAN_INTERVAL_MINUTES))
+    asyncio.create_task(run_outcome_tracker(bot))
 
     await dp.start_polling(bot)
 

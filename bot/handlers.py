@@ -268,11 +268,6 @@ async def cb_home(callback: CallbackQuery):
             reply_markup=builder.as_markup(),
         )
 
-    elif action == "history":
-        await cmd_history(callback.message)
-
-    elif action == "performance":
-        await cmd_performance(callback.message)
 
 
 @router.message(Command("help"))
@@ -531,9 +526,9 @@ async def cb_scan_symbol(callback: CallbackQuery):
     try:
         r = await _scan_symbol_for_user(symbol, callback.from_user.id)
         if r["signal"].direction in ("BUY", "SELL"):
-            text = format_signal_message(r["display_name"], r["signal"], r["trade"])
+            text = format_signal_message(r["display_name"], r["signal"], r["trade"], symbol=r["symbol"])
         else:
-            text = format_hold_message(r["display_name"], r["signal"])
+            text = format_hold_message(r["display_name"], r["signal"], symbol=r["symbol"])
         await callback.message.answer(text, parse_mode="HTML")
     except Exception as e:
         await callback.message.answer(f"❌ Could not scan <b>{symbol}</b>: {e}", parse_mode="HTML")
@@ -544,9 +539,9 @@ async def _do_signal_scan(message: Message, symbol: str, user_id: int):
     try:
         r = await _scan_symbol_for_user(symbol, user_id)
         if r["signal"].direction in ("BUY", "SELL"):
-            text = format_signal_message(r["display_name"], r["signal"], r["trade"])
+            text = format_signal_message(r["display_name"], r["signal"], r["trade"], symbol=r["symbol"])
         else:
-            text = format_hold_message(r["display_name"], r["signal"])
+            text = format_hold_message(r["display_name"], r["signal"], symbol=r["symbol"])
         await message.answer(text, parse_mode="HTML")
     except Exception as e:
         await message.answer(f"❌ Could not scan <b>{symbol}</b>: {e}", parse_mode="HTML")

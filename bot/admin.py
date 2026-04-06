@@ -40,12 +40,17 @@ async def cmd_users(message: Message):
         await message.answer("No users yet.", parse_mode="HTML")
         return
 
-    lines = [f"<b>Members ({len(users)})</b>\n"]
+    lines = [f"<b>👥 Members ({len(users)})</b>"]
     for u in users:
-        status = "Owner" if u.id == cfg.OWNER_CHAT_ID else ("Active" if u.is_premium else "Pending")
         name = u.first_name or u.username or "Unknown"
-        username = f"  @{u.username}" if u.username else ""
-        lines.append(f"{name}{username}  -  {status}  -  /approve {u.id}")
+        username = f" @{u.username}" if u.username else ""
+        if u.id == cfg.OWNER_CHAT_ID:
+            badge = "👑 Owner"
+        elif u.is_premium:
+            badge = "✅ Active"
+        else:
+            badge = "⏳ Pending"
+        lines.append(f"\n{badge}\n<b>{name}</b>{username}\n<code>/approve {u.id}</code>")
 
     await message.answer("\n".join(lines), parse_mode="HTML")
 
@@ -156,6 +161,7 @@ async def cb_approve_user(callback: CallbackQuery):
         await callback.message.edit_text(
             callback.message.text + "\n\n✅ <b>Approved</b>",
             parse_mode="HTML",
+            reply_markup=None,
         )
         try:
             await callback.bot.send_message(
@@ -180,6 +186,7 @@ async def cb_reject_user(callback: CallbackQuery):
     await callback.message.edit_text(
         callback.message.text + "\n\n❌ <b>Rejected</b>",
         parse_mode="HTML",
+        reply_markup=None,
     )
     try:
         await callback.bot.send_message(

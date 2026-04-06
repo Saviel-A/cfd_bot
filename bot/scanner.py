@@ -145,7 +145,7 @@ async def run_scan_loop(bot, interval_minutes: int = 60):
                             "indicator_votes":  signal.details,
                         })
 
-                    msg = format_signal_message(result["display_name"], signal, trade)
+                    msg = format_signal_message(result["display_name"], signal, trade, symbol=symbol)
 
                     # Broadcast to channel if configured
                     if cfg.BROADCAST_CHANNEL_ID:

@@ -47,7 +47,7 @@ def get_calendar(today_only: bool = True) -> list[dict]:
         logger.error(f"Calendar fetch failed: {e}")
         return []
 
-    today_il = date.today()  # local date
+    today_il = datetime.now(IL).date()  # Israel date, DST-aware
     results  = []
 
     for ev in events:
