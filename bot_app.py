@@ -50,6 +50,7 @@ async def main():
         BotCommand(command="timeframe",   description="Change scan timeframe. Usage: /timeframe 1h"),
         BotCommand(command="confluence",  description="Signal sensitivity. Usage: /confluence 3"),
         BotCommand(command="settings",    description="View your current settings"),
+        BotCommand(command="hours",        description="Market trading hours in Israel time"),
         BotCommand(command="help",        description="Show all commands"),
     ])
 

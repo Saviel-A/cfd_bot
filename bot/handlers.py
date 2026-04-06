@@ -23,6 +23,7 @@ from src.indicators import compute_all
 from src.signal_engine import generate_signal
 from src.risk_manager import calculate_trade
 from src.news import get_news, format_news_message
+from src.trading_hours import get_hours_message
 from bot.config import cfg
 
 logger = logging.getLogger(__name__)
@@ -129,6 +130,7 @@ async def cmd_start(message: Message):
     builder.button(text="📰 News",         callback_data="home:news")
     builder.button(text="📜 History",      callback_data="home:history")
     builder.button(text="⚙️ Settings",     callback_data="home:settings")
+    builder.button(text="🕐 Market Hours", callback_data="home:hours")
     builder.adjust(2)
 
     admin_note = "\n\n👑 Admin: /users  /approve  /revoke  /broadcast" if is_owner else ""
@@ -200,10 +202,22 @@ async def cb_home(callback: CallbackQuery):
             reply_markup=builder.as_markup(),
         )
 
+    elif action == "hours":
+        await callback.message.answer(get_hours_message(), parse_mode="HTML")
+
 
 @router.message(Command("help"))
 async def cmd_help(message: Message):
     await cmd_start(message)
+
+
+# ── /hours ───────────────────────────────────────────────────────────────────
+
+@router.message(Command("hours"))
+async def cmd_hours(message: Message):
+    await _ensure_user(message)
+    if not await _check_access(message): return
+    await message.answer(get_hours_message(), parse_mode="HTML")
 
 
 # ── /watchlist ────────────────────────────────────────────────────────────────
