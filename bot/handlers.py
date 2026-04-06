@@ -809,7 +809,7 @@ async def cb_open_setting(callback: CallbackQuery):
         )
 
     elif setting == "confluence":
-        labels = {1: "1 — Very sensitive", 2: "2 — Loose", 3: "3 — Recommended", 4: "4 — Strict"}
+        labels = {1: "1  Very sensitive", 2: "2  Loose", 3: "3  Recommended", 4: "4  Strict"}
         builder = InlineKeyboardBuilder()
         for n, label in labels.items():
             builder.button(text=label, callback_data=f"set_conf:{n}")
@@ -882,7 +882,7 @@ async def cmd_confluence(message: Message):
     await _ensure_user(message)
     parts = message.text.split()
     if len(parts) < 2 or not parts[1].isdigit() or not 1 <= int(parts[1]) <= 4:
-        labels = {1: "1 — Very sensitive", 2: "2 — Loose", 3: "3 — Recommended", 4: "4 — Strict"}
+        labels = {1: "1  Very sensitive", 2: "2  Loose", 3: "3  Recommended", 4: "4  Strict"}
         builder = InlineKeyboardBuilder()
         for n, label in labels.items():
             builder.button(text=label, callback_data=f"set_conf:{n}")
