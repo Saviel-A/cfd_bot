@@ -1,4 +1,4 @@
-"""All Telegram command handlersfully multi-user, DB-backed."""
+"""All Telegram command handlers — fully multi-user, DB-backed."""
 
 import asyncio
 import logging
@@ -92,6 +92,14 @@ async def _scan_symbol_for_user(symbol: str, user_id: int) -> dict:
     return {"symbol": symbol, "signal": signal, "trade": trade, "display_name": get_display_name(symbol)}
 
 
+def _watchlist_symbol_buttons(watchlist: list, callback_prefix: str, cols: int = 3) -> InlineKeyboardBuilder:
+    builder = InlineKeyboardBuilder()
+    for s in watchlist:
+        builder.button(text=s, callback_data=f"{callback_prefix}:{s}")
+    builder.adjust(cols)
+    return builder
+
+
 # ── /start & /help ────────────────────────────────────────────────────────────
 
 @router.message(CommandStart())
@@ -114,25 +122,83 @@ async def cmd_start(message: Message):
         )
         return
 
-    admin_section = (
-        "\n\n👑 <b>Admin</b>\n"
-        "/users  /approve  /revoke  /broadcast"
-    ) if is_owner else ""
+    builder = InlineKeyboardBuilder()
+    builder.button(text="📋 Watchlist",    callback_data="home:watchlist")
+    builder.button(text="📊 Signal",       callback_data="home:signal")
+    builder.button(text="🔎 Instruments",  callback_data="home:symbols")
+    builder.button(text="📰 News",         callback_data="home:news")
+    builder.button(text="📜 History",      callback_data="home:history")
+    builder.button(text="⚙️ Settings",     callback_data="home:settings")
+    builder.adjust(2)
+
+    admin_note = "\n\n👑 Admin: /users  /approve  /revoke  /broadcast" if is_owner else ""
 
     await message.answer(
         "📡 <b>CFD Smart Signal Bot</b>\n\n"
-        "📊 /signal — live signal for any symbol\n"
-        "📋 /watchlist — your symbols and signals\n"
-        "🔎 /symbols — browse 80+ instruments\n"
-        "➕ /add  ➖ /remove — manage watchlist\n\n"
-        "📰 /news — latest news for a symbol\n"
-        "📜 /history — your last 10 signals\n"
-        "🏆 /performance — win rate and stats\n\n"
-        "⚙️ /settings — view all your settings\n"
-        "🔔 /alerts  ⏱ /timeframe  🎯 /confluence"
-        + admin_section,
+        "Multi-timeframe signals with automatic SL and 3 TP levels."
+        + admin_note,
         parse_mode="HTML",
+        reply_markup=builder.as_markup(),
     )
+
+
+@router.callback_query(F.data.startswith("home:"))
+async def cb_home(callback: CallbackQuery):
+    action = callback.data.split(":")[1]
+    await callback.answer()
+    # Re-use existing handlers by faking a message-like object isn't clean —
+    # instead redirect by sending the appropriate command message
+    routes = {
+        "watchlist": cmd_watchlist,
+        "history":   cmd_history,
+        "settings":  cmd_settings,
+        "performance": cmd_performance,
+    }
+    if action in routes:
+        await routes[action](callback.message)
+    elif action == "signal":
+        async with AsyncSessionLocal() as session:
+            watchlist = await get_watchlist(session, callback.from_user.id)
+        if not watchlist:
+            await callback.message.answer(
+                "📋 Your watchlist is empty.\n\nUse /add or /symbols to add instruments.",
+                parse_mode="HTML",
+            )
+            return
+        builder = _watchlist_symbol_buttons(watchlist, "scan_sym")
+        builder.button(text="🔎 Browse Instruments", callback_data="home:symbols")
+        builder.adjust(3)
+        await callback.message.answer(
+            "📊 <b>Get a Signal</b>\n\nChoose a symbol from your watchlist:",
+            parse_mode="HTML",
+            reply_markup=builder.as_markup(),
+        )
+    elif action == "news":
+        async with AsyncSessionLocal() as session:
+            watchlist = await get_watchlist(session, callback.from_user.id)
+        if not watchlist:
+            await callback.message.answer(
+                "📋 Your watchlist is empty.\n\nUse /add or /symbols to add instruments.",
+                parse_mode="HTML",
+            )
+            return
+        builder = _watchlist_symbol_buttons(watchlist, "news_sym")
+        builder.adjust(3)
+        await callback.message.answer(
+            "📰 <b>Latest News</b>\n\nChoose a symbol:",
+            parse_mode="HTML",
+            reply_markup=builder.as_markup(),
+        )
+    elif action == "symbols":
+        builder = InlineKeyboardBuilder()
+        for category in CATEGORIES:
+            builder.button(text=category, callback_data=f"cat:{category}")
+        builder.adjust(2)
+        await callback.message.answer(
+            "🔎 <b>Instruments</b>\n\nSelect a category:",
+            parse_mode="HTML",
+            reply_markup=builder.as_markup(),
+        )
 
 
 @router.message(Command("help"))
@@ -151,7 +217,13 @@ async def cmd_watchlist(message: Message):
         watchlist = await get_watchlist(session, message.from_user.id)
 
     if not watchlist:
-        await message.answer("📋 <b>Your watchlist is empty.</b>\n\nUse /add XAUUSD to start tracking a symbol.", parse_mode="HTML")
+        builder = InlineKeyboardBuilder()
+        builder.button(text="🔎 Browse Instruments", callback_data="home:symbols")
+        await message.answer(
+            "📋 <b>Your watchlist is empty.</b>\n\nBrowse instruments to get started.",
+            parse_mode="HTML",
+            reply_markup=builder.as_markup(),
+        )
         return
 
     await message.answer("🔍 Scanning your watchlist...", parse_mode="HTML")
@@ -161,9 +233,36 @@ async def cmd_watchlist(message: Message):
             r = await _scan_symbol_for_user(symbol, message.from_user.id)
             results.append(r)
         except Exception as e:
-            results.append({"symbol": symbol, "error": str(e), "display_name": symbol, "signal": None})
+            results.append({"symbol": symbol, "error": str(e), "display_name": get_display_name(symbol), "signal": None})
 
-    await message.answer(format_watchlist_message(results), parse_mode="HTML")
+    builder = InlineKeyboardBuilder()
+    builder.button(text="🔄 Refresh", callback_data="refresh:watchlist")
+    builder.button(text="➕ Add Symbol", callback_data="home:symbols")
+    builder.adjust(2)
+
+    await message.answer(format_watchlist_message(results), parse_mode="HTML", reply_markup=builder.as_markup())
+
+
+@router.callback_query(F.data == "refresh:watchlist")
+async def cb_refresh_watchlist(callback: CallbackQuery):
+    await callback.answer("Refreshing...")
+    async with AsyncSessionLocal() as session:
+        watchlist = await get_watchlist(session, callback.from_user.id)
+
+    results = []
+    for symbol in watchlist:
+        try:
+            r = await _scan_symbol_for_user(symbol, callback.from_user.id)
+            results.append(r)
+        except Exception as e:
+            results.append({"symbol": symbol, "error": str(e), "display_name": get_display_name(symbol), "signal": None})
+
+    builder = InlineKeyboardBuilder()
+    builder.button(text="🔄 Refresh", callback_data="refresh:watchlist")
+    builder.button(text="➕ Add Symbol", callback_data="home:symbols")
+    builder.adjust(2)
+
+    await callback.message.edit_text(format_watchlist_message(results), parse_mode="HTML", reply_markup=builder.as_markup())
 
 
 # ── /add ──────────────────────────────────────────────────────────────────────
@@ -175,16 +274,16 @@ async def cmd_add(message: Message):
 
     parts = message.text.split()
     if len(parts) < 2:
+        builder = InlineKeyboardBuilder()
+        for category in CATEGORIES:
+            builder.button(text=category, callback_data=f"cat:{category}")
+        builder.adjust(2)
         await message.answer(
             "➕ <b>Add a Symbol</b>\n\n"
-            "Usage: <code>/add SYMBOL</code>\n\n"
-            "Examples:\n"
-            "/add XAUUSD\n"
-            "/add US30\n"
-            "/add EURUSD\n"
-            "/add BTC\n\n"
-            "Browse all available instruments: /symbols",
+            "Browse by category below, or type directly:\n"
+            "<code>/add XAUUSD</code>",
             parse_mode="HTML",
+            reply_markup=builder.as_markup(),
         )
         return
 
@@ -199,7 +298,7 @@ async def cmd_add(message: Message):
             raise ValueError("No data")
     except Exception:
         await message.answer(
-            f"❌ Could not find data for <b>{symbol}</b>.\n\nCheck the symbol and try again, or browse /symbols.",
+            f"❌ <b>{symbol}</b> not found.\n\nCheck the symbol or browse /symbols.",
             parse_mode="HTML",
         )
         return
@@ -208,7 +307,15 @@ async def cmd_add(message: Message):
         added = await add_symbol(session, message.from_user.id, symbol)
 
     if added:
-        await message.answer(f"✅ <b>{get_display_name(symbol)}</b> added to your watchlist.", parse_mode="HTML")
+        builder = InlineKeyboardBuilder()
+        builder.button(text="📋 View Watchlist", callback_data="refresh:watchlist")
+        builder.button(text="➕ Add More", callback_data="home:symbols")
+        builder.adjust(2)
+        await message.answer(
+            f"✅ <b>{get_display_name(symbol)}</b> added to your watchlist.",
+            parse_mode="HTML",
+            reply_markup=builder.as_markup(),
+        )
     else:
         await message.answer(f"<b>{symbol}</b> is already in your watchlist.", parse_mode="HTML")
 
@@ -225,13 +332,17 @@ async def cmd_remove(message: Message):
         async with AsyncSessionLocal() as session:
             watchlist = await get_watchlist(session, message.from_user.id)
         if not watchlist:
-            await message.answer("Your watchlist is empty.", parse_mode="HTML")
+            await message.answer("📋 Your watchlist is empty.", parse_mode="HTML")
             return
         builder = InlineKeyboardBuilder()
         for s in watchlist:
-            builder.button(text=f"✕ {s}", callback_data=f"remove:{s}")
+            builder.button(text=f"✕  {s}", callback_data=f"remove:{s}")
         builder.adjust(2)
-        await message.answer("➖ <b>Remove a Symbol</b>\n\nSelect a symbol to remove:", reply_markup=builder.as_markup(), parse_mode="HTML")
+        await message.answer(
+            "➖ <b>Remove a Symbol</b>\n\nTap to remove:",
+            parse_mode="HTML",
+            reply_markup=builder.as_markup(),
+        )
         return
 
     symbol = parts[1].upper()
@@ -261,22 +372,48 @@ async def cmd_signal(message: Message):
 
     parts = message.text.split()
     if len(parts) < 2:
+        async with AsyncSessionLocal() as session:
+            watchlist = await get_watchlist(session, message.from_user.id)
+
+        builder = InlineKeyboardBuilder()
+        if watchlist:
+            for s in watchlist:
+                builder.button(text=s, callback_data=f"scan_sym:{s}")
+            builder.adjust(3)
+        builder.button(text="🔎 Browse Instruments", callback_data="home:symbols")
+        builder.adjust(3)
+
         await message.answer(
             "📊 <b>Get a Signal</b>\n\n"
-            "Usage: <code>/signal SYMBOL</code>\n\n"
-            "Examples:\n"
-            "/signal XAUUSD\n"
-            "/signal US30\n"
-            "/signal BTC\n\n"
-            "Browse all instruments: /symbols",
+            + ("Choose from your watchlist:" if watchlist else "Your watchlist is empty. Browse instruments:"),
             parse_mode="HTML",
+            reply_markup=builder.as_markup(),
         )
         return
 
-    symbol = parts[1].upper()
+    await _do_signal_scan(message, parts[1].upper(), message.from_user.id)
+
+
+@router.callback_query(F.data.startswith("scan_sym:"))
+async def cb_scan_symbol(callback: CallbackQuery):
+    symbol = callback.data.split(":")[1]
+    await callback.answer()
+    await callback.message.answer(f"🔍 Scanning <b>{symbol}</b>...", parse_mode="HTML")
+    try:
+        r = await _scan_symbol_for_user(symbol, callback.from_user.id)
+        if r["signal"].direction in ("BUY", "SELL"):
+            text = format_signal_message(r["display_name"], r["signal"], r["trade"])
+        else:
+            text = format_hold_message(r["display_name"], r["signal"])
+        await callback.message.answer(text, parse_mode="HTML")
+    except Exception as e:
+        await callback.message.answer(f"❌ Could not scan <b>{symbol}</b>: {e}", parse_mode="HTML")
+
+
+async def _do_signal_scan(message: Message, symbol: str, user_id: int):
     await message.answer(f"🔍 Scanning <b>{symbol}</b>...", parse_mode="HTML")
     try:
-        r = await _scan_symbol_for_user(symbol, message.from_user.id)
+        r = await _scan_symbol_for_user(symbol, user_id)
         if r["signal"].direction in ("BUY", "SELL"):
             text = format_signal_message(r["display_name"], r["signal"], r["trade"])
         else:
@@ -295,18 +432,42 @@ async def cmd_news(message: Message):
 
     parts = message.text.split()
     if len(parts) < 2:
+        async with AsyncSessionLocal() as session:
+            watchlist = await get_watchlist(session, message.from_user.id)
+
+        builder = InlineKeyboardBuilder()
+        if watchlist:
+            for s in watchlist:
+                builder.button(text=s, callback_data=f"news_sym:{s}")
+            builder.adjust(3)
+        builder.button(text="🔎 Browse Instruments", callback_data="home:symbols")
+        builder.adjust(3)
+
         await message.answer(
             "📰 <b>Latest News</b>\n\n"
-            "Usage: <code>/news SYMBOL</code>\n\n"
-            "Examples:\n"
-            "/news XAUUSD\n"
-            "/news US30\n"
-            "/news BTC",
+            + ("Choose a symbol:" if watchlist else "Your watchlist is empty. Browse instruments:"),
             parse_mode="HTML",
+            reply_markup=builder.as_markup(),
         )
         return
 
-    symbol = parts[1].upper()
+    await _do_news_fetch(message, parts[1].upper())
+
+
+@router.callback_query(F.data.startswith("news_sym:"))
+async def cb_news_symbol(callback: CallbackQuery):
+    symbol = callback.data.split(":")[1]
+    await callback.answer()
+    await callback.message.answer(f"📰 Fetching news for <b>{symbol}</b>...", parse_mode="HTML")
+    try:
+        loop = asyncio.get_running_loop()
+        news = await loop.run_in_executor(None, lambda: get_news(symbol))
+        await callback.message.answer(format_news_message(symbol, news), parse_mode="HTML", disable_web_page_preview=True)
+    except Exception as e:
+        await callback.message.answer(f"❌ Could not fetch news: {e}", parse_mode="HTML")
+
+
+async def _do_news_fetch(message: Message, symbol: str):
     await message.answer(f"📰 Fetching news for <b>{symbol}</b>...", parse_mode="HTML")
     try:
         loop = asyncio.get_running_loop()
@@ -326,7 +487,9 @@ async def cmd_history(message: Message):
     async with AsyncSessionLocal() as session:
         signals = await get_recent_signals(session, message.from_user.id, limit=10)
 
-    await message.answer(format_history_message(signals), parse_mode="HTML")
+    builder = InlineKeyboardBuilder()
+    builder.button(text="🏆 Performance", callback_data="home:performance")
+    await message.answer(format_history_message(signals), parse_mode="HTML", reply_markup=builder.as_markup())
 
 
 # ── /performance ──────────────────────────────────────────────────────────────
@@ -339,7 +502,9 @@ async def cmd_performance(message: Message):
     async with AsyncSessionLocal() as session:
         stats = await get_performance_stats(session, message.from_user.id)
 
-    await message.answer(format_performance_message(stats), parse_mode="HTML")
+    builder = InlineKeyboardBuilder()
+    builder.button(text="📜 Signal History", callback_data="home:history")
+    await message.answer(format_performance_message(stats), parse_mode="HTML", reply_markup=builder.as_markup())
 
 
 # ── /symbols ──────────────────────────────────────────────────────────────────
@@ -355,10 +520,7 @@ async def cmd_symbols(message: Message):
     builder.adjust(2)
 
     await message.answer(
-        "📈 <b>Instruments</b>\n\n"
-        "Select a category to browse symbols.\n"
-        "Tap any symbol to add it to your watchlist.\n\n"
-        "Or add directly: <code>/add XAUUSD</code>",
+        "🔎 <b>Instruments</b>\n\nSelect a category:",
         parse_mode="HTML",
         reply_markup=builder.as_markup(),
     )
@@ -379,11 +541,11 @@ async def cb_category(callback: CallbackQuery):
             builder.button(text=f"✅ {s}", callback_data=f"noop:{s}")
         else:
             builder.button(text=f"+ {s}  {display}", callback_data=f"quickadd:{s}")
-    builder.button(text="←", callback_data="symbols_back")
+    builder.button(text="← Back", callback_data="symbols_back")
     builder.adjust(1)
 
     await callback.message.edit_text(
-        f"<b>{category}</b>\n\nTap + to add   ✅ already in watchlist",
+        f"<b>{category}</b>\n\nTap to add   ✅ = already in watchlist",
         parse_mode="HTML",
         reply_markup=builder.as_markup(),
     )
@@ -397,7 +559,7 @@ async def cb_symbols_back(callback: CallbackQuery):
         builder.button(text=category, callback_data=f"cat:{category}")
     builder.adjust(2)
     await callback.message.edit_text(
-        "<b>Instruments</b>\n\nSelect a category to browse symbols.",
+        "🔎 <b>Instruments</b>\n\nSelect a category:",
         parse_mode="HTML",
         reply_markup=builder.as_markup(),
     )
@@ -416,7 +578,10 @@ async def cb_quickadd(callback: CallbackQuery):
         added = await add_symbol(session, callback.from_user.id, symbol)
     if added:
         await callback.answer(f"✅ {symbol} added.", show_alert=False)
-        await callback.message.answer(f"✅ <b>{get_display_name(symbol)}</b> added to your watchlist.", parse_mode="HTML")
+        await callback.message.answer(
+            f"✅ <b>{get_display_name(symbol)}</b> added to your watchlist.",
+            parse_mode="HTML",
+        )
     else:
         await callback.answer("Already in your watchlist.", show_alert=False)
 
@@ -431,14 +596,14 @@ async def cmd_alerts(message: Message):
     async with AsyncSessionLocal() as session:
         if len(parts) < 2 or parts[1].lower() not in ("on", "off"):
             settings = await get_settings(session, message.from_user.id)
-            icon = "🔔" if settings.alerts_enabled else "🔕"
+            icon  = "🔔" if settings.alerts_enabled else "🔕"
             state = "ON" if settings.alerts_enabled else "OFF"
             builder = InlineKeyboardBuilder()
             builder.button(text="🔔 Turn On",  callback_data="set_alerts:on")
             builder.button(text="🔕 Turn Off", callback_data="set_alerts:off")
             builder.adjust(2)
             await message.answer(
-                f"{icon} <b>Alerts are {state}</b>\n\nAuto-push signals to you when they fire.",
+                f"{icon} <b>Alerts are {state}</b>\n\nAuto-push signals when they fire.",
                 parse_mode="HTML",
                 reply_markup=builder.as_markup(),
             )
@@ -472,7 +637,86 @@ async def cmd_settings(message: Message):
         s = await get_settings(session, message.from_user.id)
         watchlist = await get_watchlist(session, message.from_user.id)
 
-    await message.answer(format_settings_message(s, len(watchlist)), parse_mode="HTML")
+    builder = InlineKeyboardBuilder()
+    builder.button(text="🔔 Alerts",      callback_data="open_setting:alerts")
+    builder.button(text="⏱ Timeframe",   callback_data="open_setting:timeframe")
+    builder.button(text="🎯 Confluence",  callback_data="open_setting:confluence")
+    builder.button(text="💰 Balance",     callback_data="open_setting:balance")
+    builder.button(text="⚡ Risk",        callback_data="open_setting:risk")
+    builder.adjust(2)
+
+    await message.answer(
+        format_settings_message(s, len(watchlist)),
+        parse_mode="HTML",
+        reply_markup=builder.as_markup(),
+    )
+
+
+@router.callback_query(F.data.startswith("open_setting:"))
+async def cb_open_setting(callback: CallbackQuery):
+    setting = callback.data.split(":")[1]
+    await callback.answer()
+
+    if setting == "alerts":
+        async with AsyncSessionLocal() as session:
+            s = await get_settings(session, callback.from_user.id)
+        icon  = "🔔" if s.alerts_enabled else "🔕"
+        state = "ON" if s.alerts_enabled else "OFF"
+        builder = InlineKeyboardBuilder()
+        builder.button(text="🔔 Turn On",  callback_data="set_alerts:on")
+        builder.button(text="🔕 Turn Off", callback_data="set_alerts:off")
+        builder.adjust(2)
+        await callback.message.answer(
+            f"{icon} <b>Alerts are {state}</b>\n\nAuto-push signals when they fire.",
+            parse_mode="HTML",
+            reply_markup=builder.as_markup(),
+        )
+
+    elif setting == "timeframe":
+        valid = ["1m", "5m", "15m", "30m", "1h", "4h", "1d"]
+        builder = InlineKeyboardBuilder()
+        for tf in valid:
+            builder.button(text=tf, callback_data=f"set_tf:{tf}")
+        builder.adjust(4)
+        await callback.message.answer(
+            "⏱ <b>Change Timeframe</b>\n\nRecommended: <b>1h</b> or <b>4h</b>",
+            parse_mode="HTML",
+            reply_markup=builder.as_markup(),
+        )
+
+    elif setting == "confluence":
+        labels = {1: "1 — Very sensitive", 2: "2 — Loose", 3: "3 — Recommended", 4: "4 — Strict"}
+        builder = InlineKeyboardBuilder()
+        for n, label in labels.items():
+            builder.button(text=label, callback_data=f"set_conf:{n}")
+        builder.adjust(1)
+        await callback.message.answer(
+            "🎯 <b>Signal Sensitivity</b>\n\nHow many indicators must agree before a signal fires:",
+            parse_mode="HTML",
+            reply_markup=builder.as_markup(),
+        )
+
+    elif setting == "balance":
+        builder = InlineKeyboardBuilder()
+        for amt in [1000, 2000, 5000, 10000, 25000, 50000]:
+            builder.button(text=f"${amt:,}", callback_data=f"set_bal:{amt}")
+        builder.adjust(3)
+        await callback.message.answer(
+            "💰 <b>Account Balance</b>\n\nChoose a preset or type: <code>/balance 10000</code>",
+            parse_mode="HTML",
+            reply_markup=builder.as_markup(),
+        )
+
+    elif setting == "risk":
+        builder = InlineKeyboardBuilder()
+        for pct in ["0.5", "1", "1.5", "2", "3", "5"]:
+            builder.button(text=f"{pct}%", callback_data=f"set_risk:{pct}")
+        builder.adjust(3)
+        await callback.message.answer(
+            "⚡ <b>Risk Per Trade</b>\n\nRecommended: <b>1% - 2%</b>\n\nOr type: <code>/risk 1.5</code>",
+            parse_mode="HTML",
+            reply_markup=builder.as_markup(),
+        )
 
 
 # ── /timeframe ────────────────────────────────────────────────────────────────
@@ -495,7 +739,7 @@ async def cmd_timeframe(message: Message):
         return
     async with AsyncSessionLocal() as session:
         await update_settings(session, message.from_user.id, timeframe=parts[1].lower())
-    await message.answer(f"✅ Timeframe updated to <b>{parts[1].lower()}</b>.", parse_mode="HTML")
+    await message.answer(f"✅ Timeframe set to <b>{parts[1].lower()}</b>.", parse_mode="HTML")
 
 
 @router.callback_query(F.data.startswith("set_tf:"))
@@ -503,7 +747,7 @@ async def cb_set_timeframe(callback: CallbackQuery):
     tf = callback.data.split(":")[1]
     async with AsyncSessionLocal() as session:
         await update_settings(session, callback.from_user.id, timeframe=tf)
-    await callback.message.edit_text(f"✅ Timeframe updated to <b>{tf}</b>.", parse_mode="HTML")
+    await callback.message.edit_text(f"✅ Timeframe set to <b>{tf}</b>.", parse_mode="HTML")
     await callback.answer()
 
 
@@ -514,8 +758,8 @@ async def cmd_confluence(message: Message):
     await _ensure_user(message)
     parts = message.text.split()
     if len(parts) < 2 or not parts[1].isdigit() or not 1 <= int(parts[1]) <= 4:
-        builder = InlineKeyboardBuilder()
         labels = {1: "1 — Very sensitive", 2: "2 — Loose", 3: "3 — Recommended", 4: "4 — Strict"}
+        builder = InlineKeyboardBuilder()
         for n, label in labels.items():
             builder.button(text=label, callback_data=f"set_conf:{n}")
         builder.adjust(1)
@@ -527,7 +771,7 @@ async def cmd_confluence(message: Message):
         return
     async with AsyncSessionLocal() as session:
         await update_settings(session, message.from_user.id, min_confluence=int(parts[1]))
-    await message.answer(f"✅ Confluence updated to <b>{parts[1]} of 4</b>.", parse_mode="HTML")
+    await message.answer(f"✅ Confluence set to <b>{parts[1]} of 4</b>.", parse_mode="HTML")
 
 
 @router.callback_query(F.data.startswith("set_conf:"))
@@ -535,7 +779,7 @@ async def cb_set_confluence(callback: CallbackQuery):
     n = int(callback.data.split(":")[1])
     async with AsyncSessionLocal() as session:
         await update_settings(session, callback.from_user.id, min_confluence=n)
-    await callback.message.edit_text(f"✅ Confluence updated to <b>{n} of 4</b>.", parse_mode="HTML")
+    await callback.message.edit_text(f"✅ Confluence set to <b>{n} of 4</b>.", parse_mode="HTML")
     await callback.answer()
 
 
@@ -546,24 +790,33 @@ async def cmd_balance(message: Message):
     await _ensure_user(message)
     parts = message.text.split()
     if len(parts) < 2:
+        builder = InlineKeyboardBuilder()
+        for amt in [1000, 2000, 5000, 10000, 25000, 50000]:
+            builder.button(text=f"${amt:,}", callback_data=f"set_bal:{amt}")
+        builder.adjust(3)
         await message.answer(
-            "💰 <b>Set Account Balance</b>\n\n"
-            "Usage: <code>/balance AMOUNT</code>\n\n"
-            "Examples:\n"
-            "/balance 10000\n"
-            "/balance 5000\n\n"
-            "Used to calculate position size per trade.",
+            "💰 <b>Account Balance</b>\n\nChoose a preset or type the amount:\n<code>/balance 10000</code>",
             parse_mode="HTML",
+            reply_markup=builder.as_markup(),
         )
         return
     try:
         bal = float(parts[1])
     except ValueError:
-        await message.answer("❌ Enter a valid number.", parse_mode="HTML")
+        await message.answer("❌ Enter a valid number. Example: <code>/balance 10000</code>", parse_mode="HTML")
         return
     async with AsyncSessionLocal() as session:
         await update_settings(session, message.from_user.id, account_balance=bal)
-    await message.answer(f"✅ Balance updated to <b>${bal:,.0f}</b>.", parse_mode="HTML")
+    await message.answer(f"✅ Balance set to <b>${bal:,.0f}</b>.", parse_mode="HTML")
+
+
+@router.callback_query(F.data.startswith("set_bal:"))
+async def cb_set_balance(callback: CallbackQuery):
+    bal = float(callback.data.split(":")[1])
+    async with AsyncSessionLocal() as session:
+        await update_settings(session, callback.from_user.id, account_balance=bal)
+    await callback.message.edit_text(f"✅ Balance set to <b>${bal:,.0f}</b>.", parse_mode="HTML")
+    await callback.answer()
 
 
 # ── /risk ─────────────────────────────────────────────────────────────────────
@@ -573,16 +826,14 @@ async def cmd_risk(message: Message):
     await _ensure_user(message)
     parts = message.text.split()
     if len(parts) < 2:
+        builder = InlineKeyboardBuilder()
+        for pct in ["0.5", "1", "1.5", "2", "3", "5"]:
+            builder.button(text=f"{pct}%", callback_data=f"set_risk:{pct}")
+        builder.adjust(3)
         await message.answer(
-            "⚡ <b>Set Risk Per Trade</b>\n\n"
-            "Usage: <code>/risk PERCENT</code>\n\n"
-            "Examples:\n"
-            "/risk 1\n"
-            "/risk 1.5\n"
-            "/risk 2\n\n"
-            "Allowed range: 0.1% - 10%\n"
-            "Recommended: <b>1% - 2%</b>",
+            "⚡ <b>Risk Per Trade</b>\n\nRecommended: <b>1% - 2%</b>\n\nOr type: <code>/risk 1.5</code>",
             parse_mode="HTML",
+            reply_markup=builder.as_markup(),
         )
         return
     try:
@@ -594,32 +845,41 @@ async def cmd_risk(message: Message):
         return
     async with AsyncSessionLocal() as session:
         await update_settings(session, message.from_user.id, risk_percent=risk)
-    await message.answer(f"✅ Risk updated to <b>{risk}%</b> per trade.", parse_mode="HTML")
+    await message.answer(f"✅ Risk set to <b>{risk}%</b> per trade.", parse_mode="HTML")
+
+
+@router.callback_query(F.data.startswith("set_risk:"))
+async def cb_set_risk(callback: CallbackQuery):
+    risk = float(callback.data.split(":")[1])
+    async with AsyncSessionLocal() as session:
+        await update_settings(session, callback.from_user.id, risk_percent=risk)
+    await callback.message.edit_text(f"✅ Risk set to <b>{risk}%</b> per trade.", parse_mode="HTML")
+    await callback.answer()
 
 
 # ── Access request callback ───────────────────────────────────────────────────
 
 @router.callback_query(F.data.startswith("request_access:"))
 async def cb_request_access(callback: CallbackQuery):
-    user_id = callback.from_user.id
-    name = callback.from_user.first_name or callback.from_user.username or str(user_id)
+    user_id  = callback.from_user.id
+    name     = callback.from_user.first_name or callback.from_user.username or str(user_id)
+    username = f"@{callback.from_user.username}" if callback.from_user.username else "no username"
 
     builder = InlineKeyboardBuilder()
-    builder.button(text="Approve", callback_data=f"approve_user:{user_id}")
-    builder.button(text="Reject",  callback_data=f"reject_user:{user_id}")
+    builder.button(text="✅ Approve", callback_data=f"approve_user:{user_id}")
+    builder.button(text="❌ Reject",  callback_data=f"reject_user:{user_id}")
+    builder.adjust(2)
 
-    username = f"@{callback.from_user.username}" if callback.from_user.username else "no username"
     try:
         await callback.bot.send_message(
             cfg.OWNER_CHAT_ID,
             f"🔔 <b>Access Request</b>\n\n"
-            f"Name    <b>{name}</b>\n"
-            f"ID      <code>{user_id}</code>\n"
-            f"User    {username}",
+            f"👤 <b>{name}</b>  {username}\n"
+            f"🆔 <code>{user_id}</code>",
             parse_mode="HTML",
             reply_markup=builder.as_markup(),
         )
-        await callback.answer("Request submitted. You will be notified once approved.", show_alert=True)
+        await callback.answer("Request sent. You'll be notified once approved.", show_alert=True)
     except Exception as e:
         logger.error(f"Failed to notify owner: {e}")
         await callback.answer("Error sending request. Try again later.", show_alert=True)
