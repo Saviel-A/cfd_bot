@@ -1,0 +1,35 @@
+# ─────────────────────────────────────────────
+#  Instrument: EUR/USD Forex
+# ─────────────────────────────────────────────
+
+ticker: "EURUSD=X"
+display_name: "EUR/USD"
+pip_value: 0.0001
+contract_size: 100000
+
+timeframe: "1h"
+
+rsi:
+  period: 14
+  oversold: 30
+  overbought: 70
+
+ema:
+  fast: 9
+  slow: 21
+
+macd:
+  fast: 12
+  slow: 26
+  signal: 9
+
+bollinger:
+  period: 20
+  std_dev: 2.0
+
+atr:
+  period: 14
+
+key_levels:
+  support: []
+  resistance: []

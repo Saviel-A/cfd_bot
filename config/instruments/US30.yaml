@@ -1,0 +1,35 @@
+# ─────────────────────────────────────────────
+#  Instrument: Dow Jones (US30)
+# ─────────────────────────────────────────────
+
+ticker: "^DJI"
+display_name: "Dow Jones (US30)"
+pip_value: 1.0
+contract_size: 1
+
+timeframe: "1h"
+
+rsi:
+  period: 14
+  oversold: 35
+  overbought: 65
+
+ema:
+  fast: 9
+  slow: 21
+
+macd:
+  fast: 12
+  slow: 26
+  signal: 9
+
+bollinger:
+  period: 20
+  std_dev: 2.0
+
+atr:
+  period: 14
+
+key_levels:
+  support: []
+  resistance: []

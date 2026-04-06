@@ -1,0 +1,43 @@
+# ─────────────────────────────────────────────
+#  Instrument: Gold (XAU/USD)
+# ─────────────────────────────────────────────
+
+# yfinance ticker symbol
+ticker: "GC=F"
+display_name: "Gold (XAU/USD)"
+pip_value: 0.01         # 1 pip = $0.01 per oz
+contract_size: 100      # 1 lot = 100 oz
+
+# Override global timeframe for this instrument (optional)
+timeframe: "1h"
+
+# RSI settings
+rsi:
+  period: 14
+  oversold: 30
+  overbought: 70
+
+# EMA crossover settings
+ema:
+  fast: 9
+  slow: 21
+
+# MACD settings
+macd:
+  fast: 12
+  slow: 26
+  signal: 9
+
+# Bollinger Bands settings
+bollinger:
+  period: 20
+  std_dev: 2.0
+
+# ATR settings
+atr:
+  period: 14
+
+# Key support/resistance levels (update manually or leave empty)
+key_levels:
+  support: []
+  resistance: []
