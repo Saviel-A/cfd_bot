@@ -1,4 +1,4 @@
-"""All Telegram command handlers — fully multi-user, DB-backed."""
+"""All Telegram command handlersfully multi-user, DB-backed."""
 
 import asyncio
 import logging
@@ -115,30 +115,25 @@ async def cmd_start(message: Message):
         return
 
     admin_section = (
-        "\n\n🔧 <b>Admin</b>\n"
-        "/users\n"
-        "/approve 123456\n"
-        "/revoke 123456\n"
-        "/broadcast message"
+        "\n\n/users - list all members\n"
+        "/approve - grant access\n"
+        "/revoke - remove access\n"
+        "/broadcast - message all users"
     ) if is_owner else ""
 
     await message.answer(
         "📡 <b>CFD Smart Signal Bot</b>\n\n"
-        "📈 <b>Signals</b>\n"
-        "/signal XAUUSD\n"
-        "/watchlist\n"
-        "/symbols\n"
-        "/add XAUUSD\n"
-        "/remove XAUUSD\n\n"
-        "📰 <b>Analysis</b>\n"
-        "/news XAUUSD\n"
-        "/history\n"
-        "/performance\n\n"
-        "⚙️ <b>Settings</b>\n"
-        "/alerts on  |  /alerts off\n"
-        "/timeframe 1h\n"
-        "/confluence 3\n"
-        "/settings"
+        "/signal - live signal for any symbol\n"
+        "/watchlist - your symbols and signals\n"
+        "/symbols - browse 80+ instruments\n"
+        "/add  /remove - manage watchlist\n\n"
+        "/news - latest news for a symbol\n"
+        "/history - your last 10 signals\n"
+        "/performance - win rate and stats\n\n"
+        "/alerts - turn auto alerts on or off\n"
+        "/timeframe - change scan timeframe\n"
+        "/confluence - signal sensitivity\n"
+        "/settings - view all your settings"
         + admin_section,
         parse_mode="HTML",
     )
@@ -160,10 +155,10 @@ async def cmd_watchlist(message: Message):
         watchlist = await get_watchlist(session, message.from_user.id)
 
     if not watchlist:
-        await message.answer("Your watchlist is empty.\n\nUse /add XAUUSD to add a symbol.", parse_mode="HTML")
+        await message.answer("📋 <b>Your watchlist is empty.</b>\n\nUse /add XAUUSD to start tracking a symbol.", parse_mode="HTML")
         return
 
-    await message.answer("Scanning...", parse_mode="HTML")
+    await message.answer("🔍 Scanning your watchlist...", parse_mode="HTML")
     results = []
     for symbol in watchlist:
         try:
@@ -185,20 +180,21 @@ async def cmd_add(message: Message):
     parts = message.text.split()
     if len(parts) < 2:
         await message.answer(
-            "<b>Add a Symbol</b>\n\n"
-            "Usage: /add SYMBOL\n\n"
+            "➕ <b>Add a Symbol</b>\n\n"
+            "Usage: <code>/add SYMBOL</code>\n\n"
+            "Examples:\n"
             "/add XAUUSD\n"
             "/add US30\n"
             "/add EURUSD\n"
             "/add BTC\n\n"
-            "Browse all instruments: /symbols",
+            "Browse all available instruments: /symbols",
             parse_mode="HTML",
         )
         return
 
     symbol = parts[1].upper()
     ticker = get_ticker_for_symbol(symbol)
-    await message.answer("Checking symbol...", parse_mode="HTML")
+    await message.answer(f"🔍 Checking <b>{symbol}</b>...", parse_mode="HTML")
 
     try:
         loop = asyncio.get_running_loop()
@@ -207,7 +203,7 @@ async def cmd_add(message: Message):
             raise ValueError("No data")
     except Exception:
         await message.answer(
-            f"Could not find data for <b>{symbol}</b>. Check the symbol and try again.",
+            f"❌ Could not find data for <b>{symbol}</b>.\n\nCheck the symbol and try again, or browse /symbols.",
             parse_mode="HTML",
         )
         return
@@ -216,9 +212,9 @@ async def cmd_add(message: Message):
         added = await add_symbol(session, message.from_user.id, symbol)
 
     if added:
-        await message.answer(f"{get_display_name(symbol)} added to your watchlist.", parse_mode="HTML")
+        await message.answer(f"✅ <b>{get_display_name(symbol)}</b> added to your watchlist.", parse_mode="HTML")
     else:
-        await message.answer(f"{symbol} is already in your watchlist.", parse_mode="HTML")
+        await message.answer(f"<b>{symbol}</b> is already in your watchlist.", parse_mode="HTML")
 
 
 # ── /remove ───────────────────────────────────────────────────────────────────
@@ -239,14 +235,14 @@ async def cmd_remove(message: Message):
         for s in watchlist:
             builder.button(text=f"✕ {s}", callback_data=f"remove:{s}")
         builder.adjust(2)
-        await message.answer("Which symbol would you like to remove?", reply_markup=builder.as_markup())
+        await message.answer("➖ <b>Remove a Symbol</b>\n\nSelect a symbol to remove:", reply_markup=builder.as_markup(), parse_mode="HTML")
         return
 
     symbol = parts[1].upper()
     async with AsyncSessionLocal() as session:
         removed = await remove_symbol(session, message.from_user.id, symbol)
     if removed:
-        await message.answer(f"<b>{symbol}</b> removed.", parse_mode="HTML")
+        await message.answer(f"✅ <b>{symbol}</b> removed from your watchlist.", parse_mode="HTML")
     else:
         await message.answer(f"<b>{symbol}</b> is not in your watchlist.", parse_mode="HTML")
 
@@ -256,7 +252,7 @@ async def cb_remove(callback: CallbackQuery):
     symbol = callback.data.split(":")[1]
     async with AsyncSessionLocal() as session:
         await remove_symbol(session, callback.from_user.id, symbol)
-    await callback.message.edit_text(f"<b>{symbol}</b> removed.", parse_mode="HTML")
+    await callback.message.edit_text(f"✅ <b>{symbol}</b> removed from your watchlist.", parse_mode="HTML")
     await callback.answer()
 
 
@@ -269,11 +265,20 @@ async def cmd_signal(message: Message):
 
     parts = message.text.split()
     if len(parts) < 2:
-        await message.answer("Send /signal followed by a symbol. Example: /signal XAUUSD", parse_mode="HTML")
+        await message.answer(
+            "📊 <b>Get a Signal</b>\n\n"
+            "Usage: <code>/signal SYMBOL</code>\n\n"
+            "Examples:\n"
+            "/signal XAUUSD\n"
+            "/signal US30\n"
+            "/signal BTC\n\n"
+            "Browse all instruments: /symbols",
+            parse_mode="HTML",
+        )
         return
 
     symbol = parts[1].upper()
-    await message.answer(f"Scanning <b>{symbol}</b>...", parse_mode="HTML")
+    await message.answer(f"🔍 Scanning <b>{symbol}</b>...", parse_mode="HTML")
     try:
         r = await _scan_symbol_for_user(symbol, message.from_user.id)
         if r["signal"].direction in ("BUY", "SELL"):
@@ -282,7 +287,7 @@ async def cmd_signal(message: Message):
             text = format_hold_message(r["display_name"], r["signal"])
         await message.answer(text, parse_mode="HTML")
     except Exception as e:
-        await message.answer(f"Could not scan <b>{symbol}</b>: {e}", parse_mode="HTML")
+        await message.answer(f"❌ Could not scan <b>{symbol}</b>: {e}", parse_mode="HTML")
 
 
 # ── /news ─────────────────────────────────────────────────────────────────────
@@ -294,17 +299,25 @@ async def cmd_news(message: Message):
 
     parts = message.text.split()
     if len(parts) < 2:
-        await message.answer("Send /news followed by a symbol. Example: /news XAUUSD", parse_mode="HTML")
+        await message.answer(
+            "📰 <b>Latest News</b>\n\n"
+            "Usage: <code>/news SYMBOL</code>\n\n"
+            "Examples:\n"
+            "/news XAUUSD\n"
+            "/news US30\n"
+            "/news BTC",
+            parse_mode="HTML",
+        )
         return
 
     symbol = parts[1].upper()
-    await message.answer(f"Fetching news for <b>{symbol}</b>...", parse_mode="HTML")
+    await message.answer(f"📰 Fetching news for <b>{symbol}</b>...", parse_mode="HTML")
     try:
         loop = asyncio.get_running_loop()
         news = await loop.run_in_executor(None, lambda: get_news(symbol))
         await message.answer(format_news_message(symbol, news), parse_mode="HTML", disable_web_page_preview=True)
     except Exception as e:
-        await message.answer(f"Could not fetch news: {e}", parse_mode="HTML")
+        await message.answer(f"❌ Could not fetch news: {e}", parse_mode="HTML")
 
 
 # ── /history ──────────────────────────────────────────────────────────────────
@@ -346,10 +359,10 @@ async def cmd_symbols(message: Message):
     builder.adjust(2)
 
     await message.answer(
-        "<b>Instruments</b>\n\n"
+        "📈 <b>Instruments</b>\n\n"
         "Select a category to browse symbols.\n"
         "Tap any symbol to add it to your watchlist.\n\n"
-        "Or add directly:  <code>/add XAUUSD</code>  <code>/add BTC</code>",
+        "Or add directly: <code>/add XAUUSD</code>",
         parse_mode="HTML",
         reply_markup=builder.as_markup(),
     )
@@ -406,10 +419,10 @@ async def cb_quickadd(callback: CallbackQuery):
     async with AsyncSessionLocal() as session:
         added = await add_symbol(session, callback.from_user.id, symbol)
     if added:
-        await callback.answer(f"{symbol} added.", show_alert=False)
-        await callback.message.answer(f"{get_display_name(symbol)} added to your watchlist.", parse_mode="HTML")
+        await callback.answer(f"✅ {symbol} added.", show_alert=False)
+        await callback.message.answer(f"✅ <b>{get_display_name(symbol)}</b> added to your watchlist.", parse_mode="HTML")
     else:
-        await callback.answer("Already in watchlist.", show_alert=False)
+        await callback.answer("Already in your watchlist.", show_alert=False)
 
 
 # ── /alerts ───────────────────────────────────────────────────────────────────
@@ -422,17 +435,19 @@ async def cmd_alerts(message: Message):
     async with AsyncSessionLocal() as session:
         if len(parts) < 2 or parts[1].lower() not in ("on", "off"):
             settings = await get_settings(session, message.from_user.id)
+            icon = "🔔" if settings.alerts_enabled else "🔕"
             state = "ON" if settings.alerts_enabled else "OFF"
             await message.answer(
-                f"Alerts are currently <b>{state}</b>.\n"
-                "Use /alerts on or /alerts off.",
+                f"{icon} <b>Alerts are {state}</b>\n\n"
+                "Use /alerts on or /alerts off to change.",
                 parse_mode="HTML",
             )
             return
         enabled = parts[1].lower() == "on"
         await update_settings(session, message.from_user.id, alerts_enabled=enabled)
 
-    await message.answer(f"Alerts {'enabled' if enabled else 'disabled'}.", parse_mode="HTML")
+    icon = "🔔" if enabled else "🔕"
+    await message.answer(f"{icon} Alerts <b>{'enabled' if enabled else 'disabled'}</b>.", parse_mode="HTML")
 
 
 # ── /settings ─────────────────────────────────────────────────────────────────
@@ -455,11 +470,18 @@ async def cmd_timeframe(message: Message):
     valid = ["1m", "5m", "15m", "30m", "1h", "4h", "1d"]
     parts = message.text.split()
     if len(parts) < 2 or parts[1].lower() not in valid:
-        await message.answer("Choose a timeframe: 1m  5m  15m  30m  1h  4h  1d", parse_mode="HTML")
+        await message.answer(
+            "⏱ <b>Change Timeframe</b>\n\n"
+            "Usage: <code>/timeframe INTERVAL</code>\n\n"
+            "Options:\n"
+            "<code>1m  5m  15m  30m  1h  4h  1d</code>\n\n"
+            "Recommended: <b>1h</b> or <b>4h</b>",
+            parse_mode="HTML",
+        )
         return
     async with AsyncSessionLocal() as session:
         await update_settings(session, message.from_user.id, timeframe=parts[1].lower())
-    await message.answer(f"Timeframe updated to {parts[1].lower()}.", parse_mode="HTML")
+    await message.answer(f"✅ Timeframe updated to <b>{parts[1].lower()}</b>.", parse_mode="HTML")
 
 
 # ── /confluence ───────────────────────────────────────────────────────────────
@@ -469,11 +491,20 @@ async def cmd_confluence(message: Message):
     await _ensure_user(message)
     parts = message.text.split()
     if len(parts) < 2 or not parts[1].isdigit() or not 1 <= int(parts[1]) <= 4:
-        await message.answer("Send a number from 1 to 4. Recommended: 3", parse_mode="HTML")
+        await message.answer(
+            "🎯 <b>Signal Sensitivity</b>\n\n"
+            "Usage: <code>/confluence NUMBER</code>\n\n"
+            "How many indicators must agree before a signal fires:\n"
+            "<b>1</b> - Very sensitive (many signals)\n"
+            "<b>2</b> - Loose\n"
+            "<b>3</b> - Recommended\n"
+            "<b>4</b> - Strict (fewer, higher quality signals)",
+            parse_mode="HTML",
+        )
         return
     async with AsyncSessionLocal() as session:
         await update_settings(session, message.from_user.id, min_confluence=int(parts[1]))
-    await message.answer(f"Confluence updated to {parts[1]}.", parse_mode="HTML")
+    await message.answer(f"✅ Confluence updated to <b>{parts[1]} of 4</b>.", parse_mode="HTML")
 
 
 # ── /balance ──────────────────────────────────────────────────────────────────
@@ -483,16 +514,24 @@ async def cmd_balance(message: Message):
     await _ensure_user(message)
     parts = message.text.split()
     if len(parts) < 2:
-        await message.answer("Usage: /balance 10000", parse_mode="HTML")
+        await message.answer(
+            "💰 <b>Set Account Balance</b>\n\n"
+            "Usage: <code>/balance AMOUNT</code>\n\n"
+            "Examples:\n"
+            "/balance 10000\n"
+            "/balance 5000\n\n"
+            "Used to calculate position size per trade.",
+            parse_mode="HTML",
+        )
         return
     try:
         bal = float(parts[1])
     except ValueError:
-        await message.answer("Enter a valid number.", parse_mode="HTML")
+        await message.answer("❌ Enter a valid number.", parse_mode="HTML")
         return
     async with AsyncSessionLocal() as session:
         await update_settings(session, message.from_user.id, account_balance=bal)
-    await message.answer(f"Balance updated to ${bal:,.0f}.", parse_mode="HTML")
+    await message.answer(f"✅ Balance updated to <b>${bal:,.0f}</b>.", parse_mode="HTML")
 
 
 # ── /risk ─────────────────────────────────────────────────────────────────────
@@ -502,18 +541,28 @@ async def cmd_risk(message: Message):
     await _ensure_user(message)
     parts = message.text.split()
     if len(parts) < 2:
-        await message.answer("Usage: /risk 1.5  (percentage per trade)", parse_mode="HTML")
+        await message.answer(
+            "⚡ <b>Set Risk Per Trade</b>\n\n"
+            "Usage: <code>/risk PERCENT</code>\n\n"
+            "Examples:\n"
+            "/risk 1\n"
+            "/risk 1.5\n"
+            "/risk 2\n\n"
+            "Allowed range: 0.1% - 10%\n"
+            "Recommended: <b>1% - 2%</b>",
+            parse_mode="HTML",
+        )
         return
     try:
         risk = float(parts[1])
         if not 0.1 <= risk <= 10:
             raise ValueError
     except ValueError:
-        await message.answer("Enter a number between 0.1 and 10.", parse_mode="HTML")
+        await message.answer("❌ Enter a number between 0.1 and 10.", parse_mode="HTML")
         return
     async with AsyncSessionLocal() as session:
         await update_settings(session, message.from_user.id, risk_percent=risk)
-    await message.answer(f"Risk updated to {risk}% per trade.", parse_mode="HTML")
+    await message.answer(f"✅ Risk updated to <b>{risk}%</b> per trade.", parse_mode="HTML")
 
 
 # ── Access request callback ───────────────────────────────────────────────────
