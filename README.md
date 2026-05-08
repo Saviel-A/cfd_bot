@@ -68,21 +68,22 @@ The bot sends a startup message to the owner on launch.
 
 | Command | Description |
 |---|---|
-| `/start` or `/help` | Main menu with all commands |
-| `/watchlist` | View symbols and current signal for each |
-| `/add XAUUSD` | Add a symbol to the watchlist |
-| `/remove XAUUSD` | Remove a symbol |
-| `/signal XAUUSD` | Get an on-demand signal for any symbol |
-| `/scan` | Scan and broadcast matching signals now |
-| `/stats` | Win rate, TP hits, losses and best/worst symbols |
-| `/history` | Last 20 signals fired |
-| `/symbols` | Browse all 80+ instruments by category |
-| `/users` | List users who have messaged the bot |
-| `/approve` | Send a private channel invite to a subscriber |
-| `/chart XAUUSD` | Generate a 1H chart |
-| `/market` | Latest news |
-| `/calendar` | Economic calendar |
-| `/hours` | Market session times in Israel time |
+| `/start` | Owner Console |
+| `/help` | Owner Console |
+| `/signal XAUUSD` | Check Signal |
+| `/scan` | Scan Channel |
+| `/chart XAUUSD` | Chart |
+| `/stats` | Performance |
+| `/history` | History |
+| `/watchlist` | Watchlist |
+| `/symbols` | Instruments |
+| `/add XAUUSD` | Add Symbol |
+| `/remove XAUUSD` | Remove Symbol |
+| `/market` | News |
+| `/calendar` | Calendar |
+| `/hours` | Market Hours |
+| `/users` | Subscribers |
+| `/approve` | Invite Subscriber |
 
 ### Subscribers (non-owner)
 

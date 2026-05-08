@@ -70,12 +70,14 @@ def _menu_markup_main():
     builder.button(text="📈 Performance",  callback_data="home:stats")
     builder.button(text="📜 History",      callback_data="home:history")
     builder.button(text="📋 Watchlist",    callback_data="home:watchlist")
+    builder.button(text="🔎 Instruments",  callback_data="home:symbols")
     builder.button(text="➕ Add Symbol",   callback_data="home:symbols")
     builder.button(text="➖ Remove Symbol", callback_data="home:remove")
     builder.button(text="📰 News",         callback_data="home:market")
     builder.button(text="📅 Calendar",     callback_data="home:calendar")
     builder.button(text="🕐 Market Hours", callback_data="home:hours")
     builder.button(text="👥 Subscribers",  callback_data="home:users")
+    builder.button(text="✉️ Invite Subscriber", callback_data="home:approve")
     builder.button(text="📲 Share Link",   callback_data="home:sharelink")
     builder.adjust(2)
     return builder.as_markup()
@@ -99,24 +101,24 @@ def _commands_text(name: str) -> str:
         f"🤖 <b>CFD Signal Bot Owner Console</b>\n\n"
         f"Welcome, <b>{name}</b>.\n\n"
         "🔔 <b>Signals</b>\n"
-        "/signal XAUUSD - check one symbol\n"
-        "/scan - scan and post alerts\n"
-        "/chart XAUUSD - chart\n\n"
+        "/signal XAUUSD - Check Signal\n"
+        "/scan - Scan Channel\n"
+        "/chart XAUUSD - Chart\n\n"
         "📈 <b>Performance</b>\n"
-        "/stats - performance\n"
-        "/history - history\n\n"
+        "/stats - Performance\n"
+        "/history - History\n\n"
         "📋 <b>Watchlist</b>\n"
-        "/watchlist - active symbols\n"
-        "/symbols - browse\n"
-        "/add XAUUSD - add\n"
-        "/remove XAUUSD - remove\n\n"
+        "/watchlist - Watchlist\n"
+        "/symbols - Instruments\n"
+        "/add XAUUSD - Add Symbol\n"
+        "/remove XAUUSD - Remove Symbol\n\n"
         "📰 <b>Market Info</b>\n"
-        "/market - news\n"
-        "/calendar - calendar\n"
-        "/hours - market hours\n\n"
+        "/market - News\n"
+        "/calendar - Calendar\n"
+        "/hours - Market Hours\n\n"
         "👥 <b>Subscribers</b>\n"
-        "/users - manage\n"
-        "/approve - invite"
+        "/users - Subscribers\n"
+        "/approve - Invite Subscriber"
     )
 
 
