@@ -8,8 +8,9 @@ A professional Telegram signal bot for Forex, Gold, Indices and Crypto. Scans th
 2. Each symbol is analysed on two timeframes — 4H for trend bias, 1H for entry
 3. Four indicators vote: EMA cross, RSI, MACD, Bollinger Bands
 4. If 2 or more agree AND align with the 4H trend — a signal fires
-5. Stop Loss and 3 Take Profit levels are calculated using ATR
-6. The signal is broadcast to the private channel instantly
+5. Recent candle pressure must confirm the trade direction
+6. Stop Loss and 3 Take Profit levels are calculated using ATR
+7. The signal is broadcast to the private channel instantly
 
 Signals only fire on **closed candles** — never on a forming candle.
 
@@ -95,6 +96,7 @@ New Signal
 Timeframe: 1H entry, 4H trend
 Status: Active
 News: Clear
+Market pressure: Buyers 62%
 
 Trade Plan
 Entry: 2,345.60
@@ -107,7 +109,7 @@ Setup
 4H trend: Bullish
 EMA: Bullish  MACD: Bullish  RSI: Bullish
 
-Risk distance: 8.00
+Risk distance: distance from entry to Stop Loss: 8.00
 Manage risk. Not financial advice.
 ```
 
@@ -123,6 +125,7 @@ All strategy parameters are hardcoded — no user configuration needed:
 | Min confluence | 2 of 4 indicators |
 | Counter-trend signals | Blocked |
 | RSI exhaustion filter | Blocks BUY above 70 and SELL below 30 |
+| Market pressure filter | Blocks alerts when recent candles do not confirm direction |
 | Stop Loss | ATR × 0.5, clamped between 7 and 10 points |
 | TP1 | SL × 1.5 |
 | TP2 | SL × 2.0 |

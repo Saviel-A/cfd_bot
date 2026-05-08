@@ -26,6 +26,7 @@ from src.data_fetcher import fetch_ohlcv, get_live_price
 from src.indicators import compute_all
 from src.signal_engine import generate_signal
 from src.risk_manager import calculate_trade
+from src.market_pressure import analyze_market_pressure, pressure_confirms
 from src.news import get_news, format_news_message
 from src.trading_hours import get_hours_message, symbol_market_status
 from src.calendar import get_calendar, format_calendar_message
@@ -129,13 +130,27 @@ async def _scan_symbol(symbol: str) -> dict:
     df     = compute_all(df, cfg_inst)
 
     signal = generate_signal(df, SIGNAL_CFG, cfg_inst, df_htf=df_htf)
+    pressure = analyze_market_pressure(df)
+    if signal.direction in ("BUY", "SELL") and not pressure_confirms(signal.direction, pressure):
+        signal.reason = f"{signal.direction} blocked: {pressure.reason}"
+        signal.direction = "HOLD"
 
     atr   = float(df.iloc[-1].get("atr", 0) or 0)
     trade = None
     if signal.direction in ("BUY", "SELL"):
         trade = calculate_trade(signal.direction, signal.current_price, atr, RISK_CFG)
+        if trade is None:
+            signal.reason = f"{signal.direction} blocked: risk levels unavailable"
+            signal.direction = "HOLD"
 
-    return {"symbol": symbol, "signal": signal, "trade": trade, "atr": atr, "display_name": get_display_name(symbol)}
+    return {
+        "symbol": symbol,
+        "signal": signal,
+        "trade": trade,
+        "atr": atr,
+        "market_pressure": pressure.as_dict(),
+        "display_name": get_display_name(symbol),
+    }
 
 
 async def _send_closed_symbol_chart(target, symbol: str, edit_message=None):
@@ -871,7 +886,11 @@ async def cmd_signal(message: Message):
             trade = r["trade"]
             if live_price and r["atr"] > 0:
                 trade = calculate_trade(r["signal"].direction, live_price, r["atr"], RISK_CFG)
-            text = format_signal_message(r["display_name"], r["signal"], trade, symbol=r["symbol"], live_price=live_price)
+            text = format_signal_message(
+                r["display_name"], r["signal"], trade,
+                symbol=r["symbol"], live_price=live_price,
+                market_pressure=r.get("market_pressure"),
+            )
         else:
             text = format_hold_message(r["display_name"], r["signal"], symbol=r["symbol"])
 
@@ -917,7 +936,11 @@ async def cb_scan_symbol(callback: CallbackQuery):
             trade = r["trade"]
             if live_price and r["atr"] > 0:
                 trade = calculate_trade(r["signal"].direction, live_price, r["atr"], RISK_CFG)
-            text = format_signal_message(r["display_name"], r["signal"], trade, symbol=r["symbol"], live_price=live_price)
+            text = format_signal_message(
+                r["display_name"], r["signal"], trade,
+                symbol=r["symbol"], live_price=live_price,
+                market_pressure=r.get("market_pressure"),
+            )
         else:
             text = format_hold_message(r["display_name"], r["signal"], symbol=r["symbol"])
 

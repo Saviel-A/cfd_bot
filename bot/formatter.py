@@ -42,6 +42,19 @@ def _news_line(news_risk: str, news_events: Optional[list]) -> str:
     return "News: <b>Clear</b>"
 
 
+def _pressure_line(market_pressure: Optional[dict]) -> str:
+    if not market_pressure:
+        return "Market pressure: <b>Not checked</b>"
+    direction = market_pressure.get("direction", "MIXED").title()
+    buy_pct = market_pressure.get("buy_pct", 50)
+    sell_pct = market_pressure.get("sell_pct", 50)
+    if direction == "Buyers":
+        return f"Market pressure: <b>Buyers {buy_pct:.0f}%</b>"
+    if direction == "Sellers":
+        return f"Market pressure: <b>Sellers {sell_pct:.0f}%</b>"
+    return f"Market pressure: <b>Mixed</b> ({buy_pct:.0f}% buy / {sell_pct:.0f}% sell)"
+
+
 # Signal card
 def format_signal_message(
     display_name: str,
@@ -51,6 +64,7 @@ def format_signal_message(
     live_price: Optional[float] = None,
     news_risk: str = "CLEAR",
     news_events: Optional[list] = None,
+    market_pressure: Optional[dict] = None,
 ) -> str:
     name   = get_symbol_label(symbol) if symbol else display_name
     is_buy = signal.direction == "BUY"
@@ -70,6 +84,8 @@ def format_signal_message(
     macd = _vote_label(votes.get("MACD", 0))
     rsi = _vote_label(votes.get("RSI", 0))
     news = _news_line(news_risk, news_events)
+    pressure = _pressure_line(market_pressure)
+    risk_note = "Risk distance: distance from entry to Stop Loss"
 
     return (
         f"{arrow} <b>{name} {label}</b>\n"
@@ -78,6 +94,7 @@ def format_signal_message(
         f"Timeframe: <b>1H entry, 4H trend</b>\n"
         f"Status: <b>Active</b>\n"
         f"{news}\n"
+        f"{pressure}\n"
         f"\n"
         f"<b>Trade Plan</b>\n"
         f"Entry: {entry}\n"
@@ -90,7 +107,7 @@ def format_signal_message(
         f"4H trend: <b>{signal.htf_bias.title()}</b>\n"
         f"EMA: {ema}  MACD: {macd}  RSI: {rsi}\n"
         f"\n"
-        f"Risk distance: {risk}\n"
+        f"{risk_note}: {risk}\n"
         f"<i>Manage risk. Not financial advice.</i>"
     )
 

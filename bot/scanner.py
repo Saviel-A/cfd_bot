@@ -18,6 +18,7 @@ from src.data_fetcher import fetch_ohlcv, get_live_price
 from src.indicators import compute_all
 from src.signal_engine import generate_signal
 from src.risk_manager import calculate_trade
+from src.market_pressure import analyze_market_pressure, pressure_confirms
 from src.chart import generate_chart
 from src.calendar import check_news_risk
 from src.trading_hours import _is_open, symbol_market_status
@@ -56,11 +57,19 @@ async def scan_symbol(symbol: str) -> dict | None:
         df     = compute_all(df, cfg_inst)
 
         signal = generate_signal(df, SIGNAL_CFG, cfg_inst, df_htf=df_htf)
+        pressure = analyze_market_pressure(df)
+
+        if signal.direction in ("BUY", "SELL") and not pressure_confirms(signal.direction, pressure):
+            signal.reason = f"{signal.direction} blocked: {pressure.reason}"
+            signal.direction = "HOLD"
 
         atr   = float(df.iloc[-1].get("atr", 0) or 0)
         trade = None
         if signal.direction in ("BUY", "SELL"):
             trade = calculate_trade(signal.direction, signal.current_price, atr, RISK_CFG)
+            if trade is None:
+                signal.reason = f"{signal.direction} blocked: risk levels unavailable"
+                signal.direction = "HOLD"
 
         return {
             "symbol":       symbol,
@@ -68,6 +77,7 @@ async def scan_symbol(symbol: str) -> dict | None:
             "signal":       signal,
             "trade":        trade,
             "atr":          atr,
+            "market_pressure": pressure.as_dict(),
             "display_name": get_display_name(symbol),
         }
     except Exception as e:
@@ -123,6 +133,10 @@ async def _broadcast_signal(bot, symbol: str, result: dict):
         logger.info(f"{symbol}: signal BLOCKED by high-impact news: {titles}")
         return False
 
+    if trade is None:
+        logger.info(f"{symbol}: signal blocked because risk levels are unavailable")
+        return False
+
     # Use pre-fetched live price if available, otherwise fetch now
     live_price = result.get("live_price")
     if not live_price:
@@ -136,6 +150,7 @@ async def _broadcast_signal(bot, symbol: str, result: dict):
     msg = format_signal_message(
         result["display_name"], signal, trade,
         symbol=symbol, live_price=live_price, news_risk=news_risk, news_events=news_events,
+        market_pressure=result.get("market_pressure"),
     )
 
     try:
@@ -239,28 +254,28 @@ async def run_scan_loop(bot, interval_minutes: int = 60):
                         if live_price and atr > 0:
                             trade = calculate_trade(signal.direction, live_price, atr, RISK_CFG)
 
-                        entry_for_db = live_price if live_price else signal.current_price
-                        async with AsyncSessionLocal() as session:
-                            await save_signal(session, {
-                                "symbol":           symbol,
-                                "direction":        signal.direction,
-                                "timeframe":        cfg.DEFAULT_TIMEFRAME,
-                                "entry_price":      entry_for_db,
-                                "stop_loss":        trade.stop_loss if trade else entry_for_db,
-                                "tp1":              trade.tp1 if trade else entry_for_db,
-                                "tp2":              trade.tp2 if trade else entry_for_db,
-                                "tp3":              trade.tp3 if trade else entry_for_db,
-                                "sl_distance":      trade.sl_distance if trade else None,
-                                "atr":              trade.atr if trade else None,
-                                "confluence_score": signal.strength,
-                                "confluence_total": signal.total_indicators,
-                                "indicator_votes":  signal.details,
-                            })
-
                         # Pass pre-fetched live_price so _broadcast_signal doesn't fetch again
                         result["live_price"] = live_price
                         result["trade"]      = trade
-                        await _broadcast_signal(bot, symbol, result)
+                        sent = await _broadcast_signal(bot, symbol, result)
+                        if sent:
+                            entry_for_db = live_price if live_price else signal.current_price
+                            async with AsyncSessionLocal() as session:
+                                await save_signal(session, {
+                                    "symbol":           symbol,
+                                    "direction":        signal.direction,
+                                    "timeframe":        cfg.DEFAULT_TIMEFRAME,
+                                    "entry_price":      entry_for_db,
+                                    "stop_loss":        trade.stop_loss if trade else entry_for_db,
+                                    "tp1":              trade.tp1 if trade else entry_for_db,
+                                    "tp2":              trade.tp2 if trade else entry_for_db,
+                                    "tp3":              trade.tp3 if trade else entry_for_db,
+                                    "sl_distance":      trade.sl_distance if trade else None,
+                                    "atr":              trade.atr if trade else None,
+                                    "confluence_score": signal.strength,
+                                    "confluence_total": signal.total_indicators,
+                                    "indicator_votes":  signal.details,
+                                })
 
                     except Exception as e:
                         logger.error(f"Error processing {symbol}: {e}", exc_info=True)
