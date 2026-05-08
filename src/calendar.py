@@ -118,12 +118,15 @@ def format_calendar_message(events: list, today_only: bool = True) -> str:
 
     def _fmt_event(ev: dict, done: bool) -> str:
         icon     = _IMPACT_ICON.get(ev["impact"], "⚪")
-        forecast = f"  F: {ev['forecast']}" if ev["forecast"] else ""
-        prev     = f"  P: {ev['previous']}" if ev["previous"] else ""
+        forecast = f"\nForecast: <code>{ev['forecast']}</code>" if ev["forecast"] else ""
+        prev     = f"\nPrevious: <code>{ev['previous']}</code>" if ev["previous"] else ""
         check    = "✅ " if done else ""
-        return f"{check}{icon} <code>{ev['time_il']}</code>  <b>{ev['currency']}</b>  {ev['title']}{forecast}{prev}"
+        return (
+            f"{check}{icon} <code>{ev['time_il']}</code>  <b>{ev['currency']}</b>\n"
+            f"{ev['title']}{forecast}{prev}"
+        )
 
-    lines = [f"📅 <b>Economic Calendar</b>  ({period}, {tz})", ""]
+    lines = [f"📅 <b>Economic Calendar</b>", f"Period: <b>{period}</b>", f"Timezone: <b>Israel time ({tz})</b>", ""]
 
     if upcoming:
         lines.append("<b>Upcoming</b>")

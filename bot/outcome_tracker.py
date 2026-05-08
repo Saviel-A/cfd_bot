@@ -49,17 +49,17 @@ def _outcome_message(signal: Signal, outcome: str, price: float) -> str:
     now   = _fmt(price)
 
     advice = {
-        "TP1":     f"🎯 <b>TP1 Hit</b>\n\n✅ Consider securing partial profit.\n✅ Move Stop Loss to entry (<code>{entry}</code>) if still holding.",
-        "TP2":     f"🎯 <b>TP2 Hit</b>\n\n✅ Move Stop Loss to TP1 (<code>{tp1}</code>)\n✅ Consider closing 50% of the position.",
-        "TP3":     f"🏆 <b>TP3 Hit: Full Target Reached</b>\n\n✅ Close the full position.",
-        "SL":      f"❌ <b>Stop Loss Hit</b>\n\nSetup invalidated. Wait for the next clean signal.",
-        "EXPIRED": f"⏸ <b>Signal Expired</b>\n\nNo target was reached within 48h. Close if still open.",
+        "TP1":     f"🎯 <b>TP1 Reached</b>\n\nAction: consider securing partial profit.\nRisk: move Stop Loss to entry (<code>{entry}</code>) if still holding.",
+        "TP2":     f"🎯 <b>TP2 Reached</b>\n\nAction: consider closing another part of the position.\nRisk: move Stop Loss to TP1 (<code>{tp1}</code>).",
+        "TP3":     f"🏆 <b>TP3 Reached</b>\n\nAction: full target reached. Consider closing the trade.",
+        "SL":      f"❌ <b>Stop Loss Hit</b>\n\nAction: close the trade if still open.\nReason: setup is invalidated.",
+        "EXPIRED": f"⏸ <b>Signal Expired</b>\n\nAction: close if still open.\nReason: no target was reached within 48 hours.",
     }.get(outcome, outcome)
 
     return (
         f"{dot} <b>{signal.symbol} {label}</b>\n"
         f"\n"
-        f"<b>Trade Update</b>\n"
+        f"📣 <b>Trade Update</b>\n"
         f"{advice}\n"
         f"\n"
         f"Entry: <code>{entry}</code>\n"

@@ -20,6 +20,7 @@ from bot.db.repositories.signal_repo import get_recent_signals, get_signal_stats
 from bot.formatter import (
     format_signal_message, format_hold_message, format_watchlist_message,
     format_history_message, format_stats_message, format_market_closed_message,
+    format_scan_summary,
 )
 from src.instruments import load_instrument_cfg, get_display_name, get_symbol_label, get_ticker_for_symbol, CATEGORIES
 from src.data_fetcher import fetch_ohlcv, get_live_price
@@ -571,14 +572,7 @@ async def cb_home(callback: CallbackQuery):
             except Exception as e:
                 logger.error(f"Scan error {symbol}: {e}")
                 errors.append(f"{symbol}: {e}")
-        if fired:
-            result_text = f"✅ Broadcast {fired} update(s) to channel."
-        else:
-            lines = [f"📡 <b>Scan Complete</b>", "", f"Checked: <b>{checked}</b>", "Broadcasts: <b>0</b>", "", "<b>No signal reasons</b>"]
-            lines.extend(holds[:8] if holds else ["No matching setups."])
-            if errors:
-                lines.extend(["", "<b>Errors</b>", *errors[:5]])
-            result_text = "\n".join(lines)
+        result_text = format_scan_summary(checked, fired, holds, errors)
         await callback.message.edit_text(result_text, parse_mode="HTML", reply_markup=_menu_markup())
 
 
@@ -1106,8 +1100,8 @@ async def cmd_scan(message: Message):
     if not watchlist:
         await message.answer("Watchlist is empty.", reply_markup=_menu_markup())
         return
-    status = "broadcasting to channel..." if market_open else "market closed. Broadcasting status..."
-    msg = await message.answer(f"🔍 Scanning {len(watchlist)} symbols, {status}")
+    status = "checking for channel alerts" if market_open else "market closed, sending status updates"
+    msg = await message.answer(f"🔍 Scanning <b>{len(watchlist)}</b> symbol(s), {status}...", parse_mode="HTML")
     loop  = asyncio.get_running_loop()
     fired = 0
     checked = 0
@@ -1167,14 +1161,7 @@ async def cmd_scan(message: Message):
         except Exception as e:
             logger.error(f"Scan error {symbol}: {e}")
             errors.append(f"{symbol}: {e}")
-    if fired:
-        result_text = f"✅ Done: {fired} broadcast(s)."
-    else:
-        lines = [f"📡 <b>Scan Complete</b>", "", f"Checked: <b>{checked}</b>", "Broadcasts: <b>0</b>", "", "<b>No signal reasons</b>"]
-        lines.extend(holds[:8] if holds else ["No matching setups."])
-        if errors:
-            lines.extend(["", "<b>Errors</b>", *errors[:5]])
-        result_text = "\n".join(lines)
+    result_text = format_scan_summary(checked, fired, holds, errors)
     await msg.edit_text(result_text, parse_mode="HTML", reply_markup=_menu_markup())
 
 

@@ -35,6 +35,12 @@ def _vote_label(value: int) -> str:
     return "Neutral"
 
 
+def _format_reason(reason: str) -> str:
+    if not reason:
+        return "No clean setup"
+    return reason[:1].upper() + reason[1:]
+
+
 def _news_line(news_risk: str, news_events: Optional[list]) -> str:
     if news_risk == "WARN" and news_events:
         titles = ", ".join(e["title"] for e in news_events[:2])
@@ -124,8 +130,10 @@ def format_market_closed_message(display_name: str, price: Optional[float], symb
     return (
         f"{icon} <b>{name}</b>\n"
         f"\n"
+        f"<b>Status</b>\n"
         f"{status}\n"
-        f"Last price: {price_str}"
+        f"Last price: {price_str}\n\n"
+        "No signal is sent while this market is closed."
     )
 
 
@@ -136,9 +144,13 @@ def format_hold_message(display_name: str, signal: Signal, symbol: str = "") -> 
     name = get_symbol_label(symbol) if symbol else display_name
     return (
         f"⚪ <b>{name}</b>\n"
-        f"{mkt}\n"
-        f"No signal at this time.\n"
-        f"Reason: {reason}"
+        f"\n"
+        f"<b>Status</b>\n"
+        f"{mkt}\n\n"
+        f"<b>Decision</b>\n"
+        f"No signal right now.\n\n"
+        f"<b>Reason</b>\n"
+        f"{_format_reason(reason)}"
     )
 
 
@@ -160,13 +172,21 @@ def format_watchlist_message(results: list) -> str:
         dot = "🟢" if is_open else "🔴"
 
         if signal.direction == "BUY":
-            badge = "📈 BUY"
+            badge = "📈 Signal: BUY"
+            reason = "Setup is aligned"
         elif signal.direction == "SELL":
-            badge = "📉 SELL"
+            badge = "📉 Signal: SELL"
+            reason = "Setup is aligned"
         else:
-            badge = "No Signal"
+            badge = "⚪ Signal: None"
+            reason = _format_reason(signal.reason or "No clean setup")
 
-        lines.append(f"{dot} <b>{name}</b>  {price}  {badge}")
+        lines.append(
+            f"{dot} <b>{name}</b>\n"
+            f"Price: {price}\n"
+            f"{badge}\n"
+            f"Reason: {reason}\n"
+        )
 
     return "\n".join(lines)
 
@@ -179,25 +199,38 @@ def format_stats_message(stats: dict) -> str:
     win_rate = (stats["wins"] / closed * 100) if closed else 0
 
     lines = [
-        f"📊 <b>Signal Stats</b>  last {stats['total']} signals",
+        f"📊 <b>Performance Stats</b>",
+        f"Last checked signals: <b>{stats['total']}</b>",
         "",
-        f"Signals: <b>{stats['total']}</b>",
-        f"Open: <b>{stats['open']}</b>",
-        f"Closed: <b>{closed}</b>",
-        f"Wins: <b>{stats['wins']}</b>  Losses: <b>{stats['losses']}</b>  Expired: <b>{stats['expired']}</b>",
+        "<b>Summary</b>",
+        f"Open trades: <b>{stats['open']}</b>",
+        f"Closed trades: <b>{closed}</b>",
+        f"Winning trades: <b>{stats['wins']}</b>",
+        f"Losing trades: <b>{stats['losses']}</b>",
+        f"Expired trades: <b>{stats['expired']}</b>",
         f"Win rate: <b>{win_rate:.1f}%</b>",
         "",
-        f"Targets: TP1 {stats['tp1']}, TP2 {stats['tp2']}, TP3 {stats['tp3']}",
+        "<b>Targets Hit</b>",
+        f"TP1 hit: <b>{stats['tp1']}</b>",
+        f"TP2 hit: <b>{stats['tp2']}</b>",
+        f"TP3 hit: <b>{stats['tp3']}</b>",
     ]
 
     if stats["best_symbols"]:
-        best = ", ".join(f"{s['symbol']} ({s['wins']}/{s['total']})" for s in stats["best_symbols"])
-        lines.extend(["", f"Best: <b>{best}</b>"])
+        lines.extend(["", "<b>Best Symbols</b>"])
+        for s in stats["best_symbols"]:
+            lines.append(
+                f"{s['symbol']}: <b>{s['wins']}</b> wins from <b>{s['total']}</b> closed trades"
+            )
 
     if stats["worst_symbols"]:
-        worst = ", ".join(f"{s['symbol']} ({s['losses']}L/{s['total']})" for s in stats["worst_symbols"] if s["losses"])
-        if worst:
-            lines.append(f"Worst: <b>{worst}</b>")
+        worst_symbols = [s for s in stats["worst_symbols"] if s["losses"]]
+        if worst_symbols:
+            lines.extend(["", "<b>Needs Review</b>"])
+            for s in worst_symbols:
+                lines.append(
+                    f"{s['symbol']}: <b>{s['losses']}</b> losses from <b>{s['total']}</b> closed trades"
+                )
 
     return "\n".join(lines)
 
@@ -208,17 +241,18 @@ def format_history_message(signals: list, limit: int = 20) -> str:
         return "📋 <b>Signal History</b>\n\nNo signals fired yet."
 
     outcome_label = {
-        "OPEN":    "⏳ Open",
-        "TP1":     "🎯 TP1",
-        "TP2":     "🎯 TP2",
-        "TP3":     "🎯 TP3",
-        "SL":      "❌ SL",
+        "OPEN":    "⏳ Still open",
+        "TP1":     "🎯 TP1 reached",
+        "TP2":     "🎯 TP2 reached",
+        "TP3":     "🏆 TP3 reached",
+        "SL":      "❌ Stop Loss hit",
         "EXPIRED": "⏸ Expired",
+        "SUPERSEDED": "🔁 Replaced by newer signal",
     }
 
-    lines = [f"📋 <b>Signal History</b>  ({len(signals)})", ""]
+    lines = [f"📋 <b>Signal History</b>", f"Showing: <b>{len(signals)}</b>", ""]
     for s in signals:
-        dot     = "🟢" if s.direction == "BUY" else "🔴"
+        dot     = "📈" if s.direction == "BUY" else "📉"
         outcome = outcome_label.get(s.outcome, s.outcome)
         try:
             from datetime import datetime, timezone
@@ -230,8 +264,46 @@ def format_history_message(signals: list, limit: int = 20) -> str:
         except Exception:
             date = str(s.fired_at)[:16]
         lines.append(
-            f"{dot} <b>{s.symbol}</b>  {outcome}\n"
-            f"    <code>{_fmt_alert(float(s.entry_price))}</code>  {date}"
+            f"{dot} <b>{s.symbol} {s.direction}</b>\n"
+            f"Status: {outcome}\n"
+            f"Entry: <code>{_fmt_alert(float(s.entry_price))}</code>\n"
+            f"Time: {date}\n"
         )
+
+    return "\n".join(lines)
+
+
+def format_scan_summary(
+    checked: int,
+    broadcasts: int,
+    holds: list[str] | None = None,
+    errors: list[str] | None = None,
+) -> str:
+    holds = holds or []
+    errors = errors or []
+    lines = [
+        "📡 <b>Scan Complete</b>",
+        "",
+        f"Symbols checked: <b>{checked}</b>",
+        f"Updates sent to channel: <b>{broadcasts}</b>",
+    ]
+
+    if broadcasts:
+        lines.extend(["", "Channel was updated successfully."])
+    else:
+        lines.extend(["", "<b>Why no signal was sent</b>"])
+        if holds:
+            for item in holds[:8]:
+                if ":" in item:
+                    symbol, reason = item.split(":", 1)
+                    lines.append(f"{symbol.strip()}: {_format_reason(reason.strip())}")
+                else:
+                    lines.append(_format_reason(item))
+        else:
+            lines.append("No clean setup matched the strategy rules.")
+
+    if errors:
+        lines.extend(["", "<b>Errors</b>"])
+        lines.extend(errors[:5])
 
     return "\n".join(lines)
