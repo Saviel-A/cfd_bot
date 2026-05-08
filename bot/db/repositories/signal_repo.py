@@ -1,21 +1,21 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update
-from bot.db.models.signal import Signal, SignalDelivery
+from sqlalchemy import select, update, delete
+from bot.db.models.signal import Signal
 from datetime import datetime, timezone
 
 
 async def save_signal(session: AsyncSession, data: dict) -> Signal:
+    # Close any existing open signal for this symbol before creating a new one
+    await session.execute(
+        update(Signal)
+        .where(Signal.symbol == data["symbol"], Signal.outcome == "OPEN")
+        .values(outcome="SUPERSEDED", outcome_at=datetime.now(timezone.utc))
+    )
     signal = Signal(**data)
     session.add(signal)
     await session.commit()
     await session.refresh(signal)
     return signal
-
-
-async def record_delivery(session: AsyncSession, signal_id: int, user_id: int):
-    delivery = SignalDelivery(signal_id=signal_id, user_id=user_id)
-    session.add(delivery)
-    await session.commit()
 
 
 async def get_last_signal_for_symbol(session: AsyncSession, symbol: str) -> Signal | None:
@@ -29,7 +29,6 @@ async def get_last_signal_for_symbol(session: AsyncSession, symbol: str) -> Sign
 
 
 async def get_open_signals(session: AsyncSession) -> list[Signal]:
-    """All signals still waiting for outcome."""
     result = await session.execute(
         select(Signal).where(Signal.outcome == "OPEN")
     )
@@ -45,47 +44,59 @@ async def update_outcome(session: AsyncSession, signal_id: int, outcome: str):
     await session.commit()
 
 
-async def get_recent_signals(session: AsyncSession, user_id: int, limit: int = 10) -> list[Signal]:
+async def get_recent_signals(session: AsyncSession, limit: int = 20) -> list[Signal]:
     result = await session.execute(
         select(Signal)
-        .join(SignalDelivery, SignalDelivery.signal_id == Signal.id)
-        .where(SignalDelivery.user_id == user_id)
         .order_by(Signal.fired_at.desc())
         .limit(limit)
     )
     return result.scalars().all()
 
 
-async def get_performance_stats(session: AsyncSession, user_id: int) -> dict:
-    """Calculate win rate and stats from resolved signals."""
+async def get_signal_stats(session: AsyncSession, limit: int = 100) -> dict:
     result = await session.execute(
         select(Signal)
-        .join(SignalDelivery, SignalDelivery.signal_id == Signal.id)
-        .where(
-            SignalDelivery.user_id == user_id,
-            Signal.outcome != "OPEN",
-            Signal.outcome != "EXPIRED",
-        )
+        .order_by(Signal.fired_at.desc())
+        .limit(limit)
     )
     signals = result.scalars().all()
+    closed = [s for s in signals if s.outcome not in ("OPEN", "SUPERSEDED")]
+    wins = [s for s in closed if s.outcome in ("TP1", "TP2", "TP3")]
+    losses = [s for s in closed if s.outcome == "SL"]
+    expired = [s for s in closed if s.outcome == "EXPIRED"]
 
-    if not signals:
-        return {"total": 0, "wins": 0, "losses": 0, "win_rate": 0.0, "tp1": 0, "tp2": 0, "tp3": 0, "sl": 0}
+    by_symbol: dict[str, dict] = {}
+    for s in closed:
+        bucket = by_symbol.setdefault(s.symbol, {"symbol": s.symbol, "wins": 0, "losses": 0, "total": 0})
+        bucket["total"] += 1
+        if s.outcome in ("TP1", "TP2", "TP3"):
+            bucket["wins"] += 1
+        elif s.outcome == "SL":
+            bucket["losses"] += 1
 
-    tp1 = sum(1 for s in signals if s.outcome == "TP1")
-    tp2 = sum(1 for s in signals if s.outcome == "TP2")
-    tp3 = sum(1 for s in signals if s.outcome == "TP3")
-    sl  = sum(1 for s in signals if s.outcome == "SL")
-    wins = tp1 + tp2 + tp3
-    total = wins + sl
+    ranked = sorted(
+        by_symbol.values(),
+        key=lambda item: (item["wins"] - item["losses"], item["wins"], item["total"]),
+        reverse=True,
+    )
 
     return {
-        "total":    total,
-        "wins":     wins,
-        "losses":   sl,
-        "win_rate": round(wins / total * 100, 1) if total > 0 else 0.0,
-        "tp1":      tp1,
-        "tp2":      tp2,
-        "tp3":      tp3,
-        "sl":       sl,
+        "limit": limit,
+        "total": len(signals),
+        "open": sum(1 for s in signals if s.outcome == "OPEN"),
+        "closed": len(closed),
+        "wins": len(wins),
+        "losses": len(losses),
+        "expired": len(expired),
+        "tp1": sum(1 for s in closed if s.outcome == "TP1"),
+        "tp2": sum(1 for s in closed if s.outcome == "TP2"),
+        "tp3": sum(1 for s in closed if s.outcome == "TP3"),
+        "best_symbols": ranked[:3],
+        "worst_symbols": list(reversed(ranked[-3:])) if ranked else [],
     }
+
+
+async def clear_all_signals(session: AsyncSession) -> int:
+    result = await session.execute(delete(Signal))
+    await session.commit()
+    return result.rowcount

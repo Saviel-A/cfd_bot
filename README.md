@@ -1,145 +1,145 @@
 # CFD Smart Signal Bot
 
-A professional Telegram bot that scans financial instruments and delivers buy/sell signals with entry, stop loss, and 3 take profit levels. Signals are generated using multi-timeframe analysis (4H bias + 1H entry) and require confluence from multiple indicators before firing.
+A professional Telegram signal bot for Forex, Gold, Indices and Crypto. Scans the owner's watchlist on a fixed interval, generates BUY/SELL signals using multi-timeframe analysis, and broadcasts them to a private Telegram channel. Users subscribe via Telegram Stars to get access.
 
-## Features
+## How It Works
 
-- Multi-timeframe signals — 4H trend filter, 1H entry signals
-- 3 take profit levels with ATR-based stop loss
-- 80+ instruments — Metals, Forex, Indices, Crypto, Stocks
-- Automatic outcome tracking — TP/SL hit detection every 15 minutes
-- Per-user settings — watchlist, timeframe, risk, balance
-- English and Hebrew language support
-- Private access control — approve/revoke users via Telegram
-- Optional broadcast channel support
+1. The bot scans the owner's watchlist every 60 minutes (configurable)
+2. Each symbol is analysed on two timeframes — 4H for trend bias, 1H for entry
+3. Four indicators vote: EMA cross, RSI, MACD, Bollinger Bands
+4. If 2 or more agree AND align with the 4H trend — a signal fires
+5. Stop Loss and 3 Take Profit levels are calculated using ATR
+6. The signal is broadcast to the private channel instantly
+
+Signals only fire on **closed candles** — never on a forming candle.
 
 ## Requirements
 
-- Python 3.10+
-- PostgreSQL database (Supabase or self-hosted)
+- Python 3.12+
+- PostgreSQL (Supabase or self-hosted)
 - Telegram bot token from [@BotFather](https://t.me/BotFather)
 
 ## Setup
 
-### 1. Clone and create a virtual environment
+### 1. Clone and install
 
 ```bash
 git clone <your-repo>
 cd cfd_bot
-python3.10 -m venv .venv
+python3.12 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 2. Create your `.env` file
+### 2. Configure
 
 ```bash
 cp .env.example .env
 ```
 
-Edit `.env` and fill in your values:
+Fill in `.env`:
 
-```env
-TELEGRAM_BOT_TOKEN=your_bot_token_from_botfather
-OWNER_CHAT_ID=your_telegram_user_id
-POSTGRES_URL=postgresql+asyncpg://user:password@host:5432/dbname
-SCAN_INTERVAL_MINUTES=60
-BROADCAST_CHANNEL_ID=        # optional — leave empty if not using a channel
-```
+| Variable | Required | Description |
+|---|---|---|
+| `TELEGRAM_BOT_TOKEN` | Yes | Bot token from BotFather |
+| `OWNER_CHAT_ID` | Yes | Your Telegram numeric user ID |
+| `POSTGRES_URL` | Yes | PostgreSQL connection string |
+| `BROADCAST_CHANNEL_ID` | Yes | Private channel ID (e.g. `-1001234567890`) |
+| `SCAN_INTERVAL_MINUTES` | No | Scan frequency in minutes (default: 60) |
 
-**How to get your `OWNER_CHAT_ID`:** Message [@userinfobot](https://t.me/userinfobot) on Telegram — it will reply with your numeric user ID.
+**Get your `OWNER_CHAT_ID`:** Message [@userinfobot](https://t.me/userinfobot) on Telegram.
 
-### 3. Set up the database
+**Get your `BROADCAST_CHANNEL_ID`:** Forward any message from your channel to [@userinfobot](https://t.me/userinfobot) — it shows the channel ID.
 
-The bot uses PostgreSQL. All tables are created automatically on first run.
+**Make the bot admin in the channel:** The bot must have "Post Messages" permission in the channel to broadcast signals.
 
-If you are using **Supabase**:
-- Create a new project at [supabase.com](https://supabase.com)
-- Copy the connection string from **Project Settings → Database → Connection string (URI)**
-- Replace `[YOUR-PASSWORD]` with your database password
-- Change `postgresql://` to `postgresql+asyncpg://`
-
-### 4. Run the bot
+### 3. Run
 
 ```bash
 .venv/bin/python bot_app.py
 ```
 
-You should receive a confirmation message in Telegram: `✅ CFD Signal Bot is online.`
+The bot sends a startup message to the owner on launch.
 
-## Bot Commands
+## Commands
+
+### Owner
 
 | Command | Description |
 |---|---|
-| `/start` | Show the main menu |
-| `/signal XAUUSD` | Get a live signal for any symbol |
-| `/watchlist` | See all your symbols and current signals |
-| `/add XAUUSD` | Add a symbol to your watchlist |
+| `/start` or `/help` | Main menu with all commands |
+| `/watchlist` | View symbols and current signal for each |
+| `/add XAUUSD` | Add a symbol to the watchlist |
 | `/remove XAUUSD` | Remove a symbol |
-| `/symbols` | Browse 80+ instruments by category |
-| `/news XAUUSD` | Latest news for a symbol |
-| `/history` | Your last 10 received signals |
-| `/performance` | Win rate and signal stats |
-| `/alerts on\|off` | Enable or disable automatic alerts |
-| `/timeframe 1h` | Change scan timeframe |
-| `/confluence 3` | Minimum indicators that must agree (1–4) |
-| `/balance 10000` | Set your account balance for position sizing |
-| `/risk 1.5` | Set risk percentage per trade |
-| `/language` | Switch between English and Hebrew |
-| `/settings` | View all current settings |
+| `/signal XAUUSD` | Get an on-demand signal for any symbol |
+| `/scan` | Scan and broadcast matching signals now |
+| `/stats` | Win rate, TP hits, losses and best/worst symbols |
+| `/history` | Last 20 signals fired |
+| `/symbols` | Browse all 80+ instruments by category |
+| `/users` | List users who have messaged the bot |
+| `/chart XAUUSD` | Generate a 1H chart |
+| `/market` | Latest news |
+| `/calendar` | Economic calendar |
+| `/hours` | Market session times in Israel time |
 
-## Admin Commands (Owner Only)
+### Users (non-owner)
 
-| Command | Description |
+Users see a subscribe screen when they open the bot. They pay via Telegram Stars for access to the private channel where signals are broadcast.
+
+## Signal Format
+
+```
+📈 XAUUSD: Gold BUY
+
+New Signal
+Timeframe: 1H entry, 4H trend
+Status: Active
+News: Clear
+
+Trade Plan
+Entry: 2,345.60
+Stop Loss: 2,337.60
+TP1: 2,357.60
+TP2: 2,361.60
+TP3: 2,369.60
+
+Setup
+4H trend: Bullish
+EMA: Bullish  MACD: Bullish  RSI: Bullish
+
+Risk distance: 8.00
+Manage risk. Not financial advice.
+```
+
+## Strategy
+
+All strategy parameters are hardcoded — no user configuration needed:
+
+| Parameter | Value |
 |---|---|
-| `/users` | List all registered users |
-| `/approve USER_ID` | Grant access to a user |
-| `/revoke USER_ID` | Remove access from a user |
-| `/broadcast message` | Send a message to all active users |
+| Entry timeframe | 1H |
+| Trend filter | 4H EMA 20/50 |
+| Indicators | EMA cross, RSI, MACD, Bollinger Bands |
+| Min confluence | 2 of 4 indicators |
+| Counter-trend signals | Blocked |
+| RSI exhaustion filter | Blocks BUY above 70 and SELL below 30 |
+| Stop Loss | ATR × 0.5, clamped between 7 and 10 points |
+| TP1 | SL × 1.5 |
+| TP2 | SL × 2.0 |
+| TP3 | SL × 3.0 |
 
-## Environment Variables
-
-| Variable | Required | Default | Description |
-|---|---|---|---|
-| `TELEGRAM_BOT_TOKEN` | Yes | — | Bot token from BotFather |
-| `OWNER_CHAT_ID` | Yes | — | Your Telegram user ID |
-| `POSTGRES_URL` | Yes | — | PostgreSQL connection string |
-| `SCAN_INTERVAL_MINUTES` | No | `60` | How often to scan watchlists |
-| `BROADCAST_CHANNEL_ID` | No | — | Channel ID to broadcast signals to |
-| `DEFAULT_TIMEFRAME` | No | `1h` | Default entry timeframe |
-| `HTF_TIMEFRAME` | No | `4h` | Higher timeframe for bias filter |
-| `ACCOUNT_BALANCE` | No | `10000` | Default account balance |
-| `RISK_PERCENT` | No | `1.5` | Default risk per trade (%) |
-| `SL_ATR_MULTIPLIER` | No | `1.5` | ATR multiplier for stop loss |
-
-## Signal Logic
-
-1. **4H candle** — determines trend bias via EMA 50/200
-2. **1H candle** — checks for entry signals aligned with 4H bias
-3. Counter-trend signals are discarded
-4. A minimum of 3 out of 4 indicators must agree before a signal fires
-5. Stop Loss = ATR × 1.5, TP1 = 1.5R, TP2 = 2.5R, TP3 = 4.0R
-
-Signals are only generated on **closed candles** — never on a forming candle.
-
-## Adding Symbols
-
-Any symbol from yfinance can be added dynamically via `/add`. The bot supports 80+ pre-configured instruments across Metals, Energy, Indices, Forex, Crypto, and Stocks.
-
-To add a custom symbol not in the pre-configured list, just use `/add TICKER` where `TICKER` is a valid yfinance ticker (e.g. `AAPL`, `GC=F`).
-
-## Running in the Background (Linux/Mac)
+## Running in the Background
 
 ```bash
 nohup .venv/bin/python bot_app.py > bot.log 2>&1 &
 ```
 
-Or with a process manager like `pm2`:
+Or with pm2:
 
 ```bash
-pm2 start "source .venv/bin/activate && python bot_app.py" --name cfd-bot
+pm2 start ".venv/bin/python bot_app.py" --name cfd-bot
 ```
 
 ## Disclaimer
 
-This bot provides trading signals for informational purposes only. It is not financial advice. Always manage your own risk.
+Signals are for informational purposes only. Not financial advice. Always manage your own risk.

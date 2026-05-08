@@ -44,8 +44,16 @@ def calculate_trade(
     balance  = float(risk_cfg.get("account_balance", 10000))
     risk_pct = float(risk_cfg.get("risk_percent", 1.5))
 
-    sl_dist      = atr * sl_mult
-    risk_amount  = balance * (risk_pct / 100)
+    sl_dist = atr * sl_mult
+
+    # Clamp SL distance between sl_min and sl_max if configured
+    sl_min = risk_cfg.get("sl_min")
+    sl_max = risk_cfg.get("sl_max")
+    if sl_min is not None:
+        sl_dist = max(sl_dist, float(sl_min))
+    if sl_max is not None:
+        sl_dist = min(sl_dist, float(sl_max))
+    risk_amount = balance * (risk_pct / 100)
     position_size = risk_amount / sl_dist if sl_dist > 0 else 0
 
     if direction == "BUY":

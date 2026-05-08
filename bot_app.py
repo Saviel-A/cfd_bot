@@ -1,5 +1,5 @@
 """
-CFD Smart Signal Bot — Production Entry Point
+CFD Smart Signal Bot: Production Entry Point
 
 Usage:
     .venv/bin/python bot_app.py
@@ -19,10 +19,16 @@ logger = logging.getLogger(__name__)
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
-from aiogram.types import BotCommand
+from aiogram.types import (
+    BotCommand,
+    BotCommandScopeDefault,
+    BotCommandScopeAllPrivateChats,
+    BotCommandScopeAllGroupChats,
+    BotCommandScopeChat,
+)
 
 from bot.config import cfg
-from bot.handlers import router
+from bot.handlers import router, set_bot_username
 from bot.admin import admin_router
 from bot.scanner import run_scan_loop
 from bot.outcome_tracker import run_outcome_tracker
@@ -34,37 +40,58 @@ async def main():
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
     )
     dp = Dispatcher()
-    dp.include_router(admin_router)  # admin first so owner commands take priority
+    dp.include_router(admin_router)
     dp.include_router(router)
 
-    await bot.set_my_commands([
-        BotCommand(command="signal",      description="Live signal for a symbol. Usage: /signal XAUUSD"),
-        BotCommand(command="watchlist",   description="Your symbols and current signals"),
-        BotCommand(command="add",         description="Add a symbol. Usage: /add XAUUSD"),
-        BotCommand(command="remove",      description="Remove a symbol. Usage: /remove XAUUSD"),
-        BotCommand(command="symbols",     description="Browse 80+ instruments by category"),
-        BotCommand(command="news",        description="Latest news for a symbol. Usage: /news XAUUSD"),
-        BotCommand(command="history",     description="Your last 10 received signals"),
-        BotCommand(command="performance", description="Your win rate and signal stats"),
-        BotCommand(command="alerts",      description="Toggle auto alerts. Usage: /alerts on or off"),
-        BotCommand(command="timeframe",   description="Change scan timeframe. Usage: /timeframe 1h"),
-        BotCommand(command="confluence",  description="Signal sensitivity. Usage: /confluence 3"),
-        BotCommand(command="settings",    description="View your current settings"),
-        BotCommand(command="calendar",     description="Economic calendar — today's high impact events"),
-        BotCommand(command="hours",        description="Market trading hours in Israel time"),
-        BotCommand(command="help",        description="Show all commands"),
-    ])
+    # Clear all scopes to remove stale cached commands
+    for scope in (BotCommandScopeDefault(), BotCommandScopeAllPrivateChats(), BotCommandScopeAllGroupChats()):
+        try:
+            await bot.delete_my_commands(scope=scope)
+        except Exception:
+            pass
 
-    logger.info(f"Bot started | Owner: {cfg.OWNER_CHAT_ID} | Scan: {cfg.SCAN_INTERVAL_MINUTES}m")
+    user_commands = [
+        BotCommand(command="start", description="Subscribe"),
+    ]
+    owner_commands = [
+        BotCommand(command="start", description="Dashboard"),
+        BotCommand(command="signal", description="Signal for symbol"),
+        BotCommand(command="scan", description="Scan now"),
+        BotCommand(command="chart", description="Chart"),
+        BotCommand(command="stats", description="Performance stats"),
+        BotCommand(command="history", description="Signal history"),
+        BotCommand(command="watchlist", description="Watchlist"),
+        BotCommand(command="add", description="Add symbol"),
+        BotCommand(command="remove", description="Remove symbol"),
+        BotCommand(command="symbols", description="Browse instruments"),
+        BotCommand(command="market", description="News"),
+        BotCommand(command="calendar", description="Calendar"),
+        BotCommand(command="hours", description="Market hours"),
+        BotCommand(command="users", description="Users"),
+        BotCommand(command="help", description="Help"),
+    ]
+    await bot.set_my_commands(user_commands, scope=BotCommandScopeDefault())
+    await bot.set_my_commands(user_commands, scope=BotCommandScopeAllPrivateChats())
+    await bot.set_my_commands(owner_commands, scope=BotCommandScopeChat(chat_id=cfg.OWNER_CHAT_ID))
+
+    # Store bot username for deep link generation
+    me = await bot.get_me()
+    set_bot_username(me.username)
+    logger.info(f"Bot started | @{me.username} | Owner: {cfg.OWNER_CHAT_ID} | Scan: {cfg.SCAN_INTERVAL_MINUTES}m | Channel: {cfg.BROADCAST_CHANNEL_ID}")
+
+    share_link = f"https://t.me/{me.username}" if me.username else ""
+
     try:
+        from bot.handlers import _menu_markup_main, _commands_text
+        name = "Owner"
         await bot.send_message(
             cfg.OWNER_CHAT_ID,
-            "🤖 <b>CFD Signal Bot is online.</b>\n\n"
-            f"📡 Scanning every <b>{cfg.SCAN_INTERVAL_MINUTES} minutes</b>.\n"
-            "Use /help to see all commands.",
+            f"🤖 <b>CFD Signal Bot is Online</b>\n\n"
+            f"📲 Share with subscribers: <code>{share_link}</code>",
+            reply_markup=_menu_markup_main(),
         )
     except Exception as e:
-        logger.warning(f"Could not send startup message: {e} — send /start to the bot first.")
+        logger.warning(f"Could not send startup message: {e}")
 
     asyncio.create_task(run_scan_loop(bot, cfg.SCAN_INTERVAL_MINUTES))
     asyncio.create_task(run_outcome_tracker(bot))

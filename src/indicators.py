@@ -33,8 +33,8 @@ def add_rsi(df: pd.DataFrame, period: int = 14, oversold: int = 30, overbought: 
     df["rsi"] = df["rsi"].fillna(50)
 
     df["rsi_signal"] = 0
-    df.loc[df["rsi"] <= oversold, "rsi_signal"] = 1
-    df.loc[df["rsi"] >= overbought, "rsi_signal"] = -1
+    df.loc[df["rsi"] > 50, "rsi_signal"] = 1
+    df.loc[df["rsi"] < 50, "rsi_signal"] = -1
     return df
 
 
@@ -63,8 +63,8 @@ def add_bollinger(df: pd.DataFrame, period: int = 20, std_dev: float = 2.0) -> p
     df["bb_lower"] = df["bb_mid"] - std_dev * rolling_std
 
     df["bb_signal"] = 0
-    df.loc[df["close"] <= df["bb_lower"], "bb_signal"] = 1
-    df.loc[df["close"] >= df["bb_upper"], "bb_signal"] = -1
+    df.loc[df["close"] > df["bb_mid"], "bb_signal"] = 1
+    df.loc[df["close"] < df["bb_mid"], "bb_signal"] = -1
     df["bb_bandwidth"] = (df["bb_upper"] - df["bb_lower"]) / df["bb_mid"]
     return df
 

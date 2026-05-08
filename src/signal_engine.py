@@ -22,17 +22,18 @@ class Signal:
     htf_bias: str = "NEUTRAL"   # BULLISH / BEARISH / NEUTRAL
     candle_time: Optional[str] = None
     current_price: Optional[float] = None
+    reason: str = ""
 
 
 def _htf_bias(df_htf: pd.DataFrame) -> str:
-    """Determine 4H trend via EMA 50/200."""
-    if df_htf is None or len(df_htf) < 200:
+    """Determine 4H trend via EMA 20/50."""
+    if df_htf is None or len(df_htf) < 50:
         return "NEUTRAL"
-    ema50  = df_htf["close"].ewm(span=50,  adjust=False).mean().iloc[-1]
-    ema200 = df_htf["close"].ewm(span=200, adjust=False).mean().iloc[-1]
-    if ema50 > ema200:
+    ema20 = df_htf["close"].ewm(span=20, adjust=False).mean().iloc[-1]
+    ema50 = df_htf["close"].ewm(span=50, adjust=False).mean().iloc[-1]
+    if ema20 > ema50:
         return "BULLISH"
-    elif ema50 < ema200:
+    elif ema20 < ema50:
         return "BEARISH"
     return "NEUTRAL"
 
@@ -66,6 +67,7 @@ def generate_signal(
     latest      = df.iloc[-1]
     candle_time = str(df.index[-1])
     price       = float(latest["close"])
+    rsi         = float(latest.get("rsi", 50) or 50)
 
     htf_bias = _htf_bias(df_htf)
 
@@ -79,22 +81,35 @@ def generate_signal(
     bull_count = sum(1 for v in votes.values() if v == 1)
     bear_count = sum(1 for v in votes.values() if v == -1)
 
-    # Determine raw direction
-    if bull_count >= min_confluence:
+    reason = ""
+
+    if htf_bias == "NEUTRAL":
+        raw_dir = "HOLD"
+        strength = max(bull_count, bear_count)
+        reason = "4H trend is neutral"
+    elif htf_bias == "BULLISH" and bull_count >= min_confluence:
         raw_dir = "BUY"
         strength = bull_count
-    elif bear_count >= min_confluence:
+        reason = "4H bullish trend + 1H bullish confirmation"
+        if rsi > 70:
+            raw_dir = "HOLD"
+            reason = "BUY blocked: RSI is overbought"
+    elif htf_bias == "BEARISH" and bear_count >= min_confluence:
         raw_dir = "SELL"
         strength = bear_count
+        reason = "4H bearish trend + 1H bearish confirmation"
+        if rsi < 30:
+            raw_dir = "HOLD"
+            reason = "SELL blocked: RSI is oversold"
     else:
         raw_dir = "HOLD"
         strength = max(bull_count, bear_count)
-
-    # HTF bias gate — discard counter-trend signals
-    if raw_dir == "BUY"  and htf_bias == "BEARISH":
-        raw_dir = "HOLD"
-    if raw_dir == "SELL" and htf_bias == "BULLISH":
-        raw_dir = "HOLD"
+        if htf_bias == "BULLISH" and bear_count >= min_confluence:
+            reason = "SELL blocked: counter-trend to 4H bullish bias"
+        elif htf_bias == "BEARISH" and bull_count >= min_confluence:
+            reason = "BUY blocked: counter-trend to 4H bearish bias"
+        else:
+            reason = "Not enough aligned confirmation"
 
     return Signal(
         direction=raw_dir,
@@ -104,11 +119,12 @@ def generate_signal(
         htf_bias=htf_bias,
         candle_time=candle_time,
         current_price=price,
+        reason=reason,
     )
 
 
 def signal_summary(signal: Signal, instrument_name: str) -> str:
-    icons = {"BUY": "▲ BUY", "SELL": "▼ SELL", "HOLD": "◆ HOLD"}
+    icons = {"BUY": "📈 BUY", "SELL": "📉 SELL", "HOLD": "No Signal"}
     return (
         f"{instrument_name} | {icons.get(signal.direction, signal.direction)} | "
         f"HTF: {signal.htf_bias} | "

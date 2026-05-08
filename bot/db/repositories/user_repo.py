@@ -1,7 +1,7 @@
+from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from bot.db.models.user import User
-from bot.db.models.settings import UserSettings
 
 
 async def get_or_create_user(session: AsyncSession, tg_id: int, username: str | None, first_name: str | None) -> User:
@@ -10,17 +10,9 @@ async def get_or_create_user(session: AsyncSession, tg_id: int, username: str | 
     if user is None:
         user = User(id=tg_id, username=username, first_name=first_name)
         session.add(user)
-        await session.flush()  # write user row before FK reference
-        settings = UserSettings(user_id=tg_id)
-        session.add(settings)
         await session.commit()
         await session.refresh(user)
     return user
-
-
-async def get_all_active_users(session: AsyncSession) -> list[User]:
-    result = await session.execute(select(User).where(User.is_active == True))
-    return result.scalars().all()
 
 
 async def get_all_users(session: AsyncSession) -> list[User]:
@@ -28,20 +20,38 @@ async def get_all_users(session: AsyncSession) -> list[User]:
     return result.scalars().all()
 
 
-async def set_premium(session: AsyncSession, user_id: int, value: bool) -> bool:
-    """Returns True if user found and updated."""
+async def get_user_by_username(session: AsyncSession, username: str) -> User | None:
+    clean = username.lstrip("@").lower()
+    result = await session.execute(select(User).where(User.username.ilike(clean)))
+    return result.scalar_one_or_none()
+
+
+async def mark_invited(session: AsyncSession, user_id: int) -> bool:
     result = await session.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if user is None:
         return False
-    user.is_premium = value
+    user.is_invited = True
     await session.commit()
     return True
 
 
-async def is_premium_or_owner(session: AsyncSession, user_id: int, owner_id: int) -> bool:
-    if user_id == owner_id:
-        return True
-    result = await session.execute(select(User.is_premium).where(User.id == user_id))
-    row = result.scalar_one_or_none()
-    return bool(row)
+async def delete_user(session: AsyncSession, user_id: int) -> bool:
+    result = await session.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if user is None:
+        return False
+    await session.delete(user)
+    await session.commit()
+    return True
+
+
+async def grant_premium_until(session: AsyncSession, user_id: int, until: datetime) -> bool:
+    result = await session.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if user is None:
+        return False
+    user.is_premium = True
+    user.premium_until = until
+    await session.commit()
+    return True

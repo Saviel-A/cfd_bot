@@ -27,6 +27,7 @@ models/
 # Logs
 *.log
 logs/
+*.pid
 
 # IDE
 .vscode/

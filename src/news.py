@@ -46,26 +46,21 @@ def get_news(symbol: str, limit: int = 5) -> list[dict]:
 
 def format_news_message(symbol: str, news: list[dict]) -> str:
     if not news:
-        return f"<b>{symbol}</b>\n\nNo recent news found."
+        return f"📰 <b>{symbol} News</b>\n\nNo recent news found."
 
-    lines = [f"📰 <b>{symbol} — Latest News</b>"]
-    for item in news:
+    lines = [f"📰 <b>{symbol} News</b>", ""]
+    for i, item in enumerate(news, 1):
         title     = item.get("title") or "No title"
         publisher = item.get("publisher", "")
-        summary   = item.get("summary", "")
         link      = item.get("link", "")
+        pub_str   = f"  <b>·</b>  {publisher}" if publisher else ""
 
         if link:
-            lines.append(f"\n• <a href=\"{link}\">{title}</a>")
+            lines.append(f"{i}.  <a href=\"{link}\">{title}</a>{pub_str}")
         else:
-            lines.append(f"\n• <b>{title}</b>")
+            lines.append(f"{i}.  <b>{title}</b>{pub_str}")
 
-        if summary:
-            # Trim long summaries
-            short = summary[:120] + "…" if len(summary) > 120 else summary
-            lines.append(f"  <i>{short}</i>")
-
-        if publisher:
-            lines.append(f"  <i>— {publisher}</i>")
+        if i < len(news):
+            lines.append("")
 
     return "\n".join(lines)

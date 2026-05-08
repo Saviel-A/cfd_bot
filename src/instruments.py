@@ -8,7 +8,7 @@ from typing import Dict
 # Format: "SYMBOL": ("yfinance_ticker", "Display Name")
 
 TICKER_MAP: Dict[str, tuple] = {
-    # ── Metals ─────────────────────────────────────────────────────
+    # Metals
     "XAUUSD":   ("GC=F",      "Gold"),
     "GOLD":     ("GC=F",      "Gold"),
     "XAGUSD":   ("SI=F",      "Silver"),
@@ -16,26 +16,26 @@ TICKER_MAP: Dict[str, tuple] = {
     "XPTUSD":   ("PL=F",      "Platinum"),
     "COPPER":   ("HG=F",      "Copper"),
 
-    # ── Energy ─────────────────────────────────────────────────────
+    # Energy
     "USOIL":    ("CL=F",      "WTI Crude Oil"),
     "OIL":      ("CL=F",      "WTI Crude Oil"),
     "WTIUSD":   ("CL=F",      "WTI Crude Oil"),
     "BRENT":    ("BZ=F",      "Brent Crude Oil"),
     "NATGAS":   ("NG=F",      "Natural Gas"),
 
-    # ── US Indices ─────────────────────────────────────────────────
+    # US Indices
     "US30":     ("^DJI",      "Dow Jones 30"),
     "DJI":      ("^DJI",      "Dow Jones 30"),
     "US500":    ("^GSPC",     "S&P 500"),
     "SPX":      ("^GSPC",     "S&P 500"),
     "SP500":    ("^GSPC",     "S&P 500"),
-    "NAS100":   ("^IXIC",     "Nasdaq 100"),
-    "NDX":      ("^IXIC",     "Nasdaq 100"),
-    "NASDAQ":   ("^IXIC",     "Nasdaq 100"),
+    "NAS100":   ("^NDX",      "Nasdaq 100"),
+    "NDX":      ("^NDX",      "Nasdaq 100"),
+    "NASDAQ":   ("^NDX",      "Nasdaq 100"),
     "US2000":   ("^RUT",      "Russell 2000"),
     "VIX":      ("^VIX",      "Volatility Index"),
 
-    # ── European Indices ───────────────────────────────────────────
+    # European Indices
     "UK100":    ("^FTSE",     "FTSE 100"),
     "FTSE":     ("^FTSE",     "FTSE 100"),
     "GER40":    ("^GDAXI",    "DAX 40"),
@@ -46,14 +46,14 @@ TICKER_MAP: Dict[str, tuple] = {
     "EU50":     ("^STOXX50E", "Euro Stoxx 50"),
     "SWI20":    ("^SSMI",     "Swiss SMI"),
 
-    # ── Asian Indices ──────────────────────────────────────────────
+    # Asian Indices
     "JPN225":   ("^N225",     "Nikkei 225"),
     "NIKKEI":   ("^N225",     "Nikkei 225"),
     "HK50":     ("^HSI",      "Hang Seng 50"),
     "AUS200":   ("^AXJO",     "ASX 200"),
     "CHN50":    ("000300.SS", "CSI 300"),
 
-    # ── Major Forex ────────────────────────────────────────────────
+    # Major Forex
     "EURUSD":   ("EURUSD=X",  "EUR/USD"),
     "GBPUSD":   ("GBPUSD=X",  "GBP/USD"),
     "USDJPY":   ("JPY=X",     "USD/JPY"),
@@ -62,7 +62,7 @@ TICKER_MAP: Dict[str, tuple] = {
     "NZDUSD":   ("NZDUSD=X",  "NZD/USD"),
     "USDCAD":   ("CAD=X",     "USD/CAD"),
 
-    # ── Minor Forex ────────────────────────────────────────────────
+    # Minor Forex
     "EURGBP":   ("EURGBP=X",  "EUR/GBP"),
     "EURJPY":   ("EURJPY=X",  "EUR/JPY"),
     "GBPJPY":   ("GBPJPY=X",  "GBP/JPY"),
@@ -82,7 +82,7 @@ TICKER_MAP: Dict[str, tuple] = {
     "GBPCAD":   ("GBPCAD=X",  "GBP/CAD"),
     "GBPNZD":   ("GBPNZD=X",  "GBP/NZD"),
 
-    # ── Crypto ─────────────────────────────────────────────────────
+    # Crypto
     "BTC":      ("BTC-USD",   "Bitcoin"),
     "BTCUSD":   ("BTC-USD",   "Bitcoin"),
     "ETH":      ("ETH-USD",   "Ethereum"),
@@ -98,7 +98,7 @@ TICKER_MAP: Dict[str, tuple] = {
     "LINK":     ("LINK-USD",  "Chainlink"),
     "LTC":      ("LTC-USD",   "Litecoin"),
 
-    # ── Popular Stocks ─────────────────────────────────────────────
+    # Popular Stocks
     "AAPL":     ("AAPL",      "Apple"),
     "TSLA":     ("TSLA",      "Tesla"),
     "NVDA":     ("NVDA",      "NVIDIA"),
@@ -123,6 +123,13 @@ CATEGORIES = {
     "Crypto":        ["BTC", "ETH", "SOL", "BNB", "XRP"],
     "Stocks":        ["AAPL", "TSLA", "NVDA", "AMZN", "MSFT"],
 }
+
+# Spot price tickers — used ONLY for live price display.
+# OHLCV signal data still uses the main TICKER_MAP ticker.
+# Note: =X forex/spot tickers are not reliably supported by yfinance;
+# futures tickers are used as the best available proxy.
+SPOT_PRICE_MAP: Dict[str, str] = {}
+
 
 DEFAULT_CFG = {
     "rsi":       {"period": 14, "oversold": 30, "overbought": 70},
@@ -155,6 +162,28 @@ def get_ticker_for_symbol(symbol: str) -> str:
     return ticker
 
 
+def get_spot_ticker(symbol: str) -> str:
+    """Return the best ticker for live price display (spot where available)."""
+    upper = symbol.upper()
+    return SPOT_PRICE_MAP.get(upper, get_ticker_for_symbol(upper))
+
+
+def get_spot_ticker_with_fallback(symbol: str) -> list[str]:
+    """Return [spot_ticker, fallback_data_ticker] — try in order until one works."""
+    upper = symbol.upper()
+    spot = SPOT_PRICE_MAP.get(upper)
+    data = get_ticker_for_symbol(upper)
+    return [spot, data] if spot and spot != data else [data]
+
+
 def get_display_name(symbol: str) -> str:
     _, _, display = resolve_symbol(symbol)
     return display
+
+
+def get_symbol_label(symbol: str) -> str:
+    """Return a clean UI label like 'XAUUSD: Gold' without duplicate text."""
+    upper, _, display = resolve_symbol(symbol)
+    if display.upper() == upper:
+        return upper
+    return f"{upper}: {display}"

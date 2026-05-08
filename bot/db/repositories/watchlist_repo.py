@@ -35,12 +35,3 @@ async def remove_symbol(session: AsyncSession, user_id: int, symbol: str) -> boo
     )
     await session.commit()
     return len(result.all()) > 0
-
-
-async def get_all_watchlists(session: AsyncSession) -> dict[int, list[str]]:
-    """Returns {user_id: [symbols]} for all users."""
-    result = await session.execute(select(UserWatchlist.user_id, UserWatchlist.symbol))
-    watchlists: dict[int, list[str]] = {}
-    for user_id, symbol in result.all():
-        watchlists.setdefault(user_id, []).append(symbol)
-    return watchlists

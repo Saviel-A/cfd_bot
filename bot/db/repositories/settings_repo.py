@@ -12,12 +12,3 @@ async def get_settings(session: AsyncSession, user_id: int) -> UserSettings:
         await session.commit()
         await session.refresh(settings)
     return settings
-
-
-async def update_settings(session: AsyncSession, user_id: int, **kwargs) -> UserSettings:
-    settings = await get_settings(session, user_id)
-    for key, value in kwargs.items():
-        setattr(settings, key, value)
-    await session.commit()
-    await session.refresh(settings)
-    return settings

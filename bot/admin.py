@@ -1,198 +1,136 @@
 """
-Admin commands — owner only.
+Admin commands: owner only.
 
-/users       — list all users with status
-/approve ID  — grant premium access
-/revoke ID   — remove premium access
-/broadcast MSG — send a message to all premium users
+/users         : list all users who have messaged the bot
+/approve       : pick a user from a list, or /approve @username / /approve ID
 """
 
 import logging
 
-from aiogram import Router, F
+from aiogram import Router
 from aiogram.filters import Command
-from aiogram.types import Message, CallbackQuery
+from aiogram.types import Message
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from bot.config import cfg
 from bot.db.session import AsyncSessionLocal
-from bot.db.repositories.user_repo import get_all_users, set_premium
+from bot.db.repositories.user_repo import get_all_users, get_user_by_username
 
 logger = logging.getLogger(__name__)
 admin_router = Router()
 
 
-def _is_owner(message: Message) -> bool:
-    return message.from_user.id == cfg.OWNER_CHAT_ID
+def _is_owner(uid: int) -> bool:
+    return uid == cfg.OWNER_CHAT_ID
 
 
-# ── /users ────────────────────────────────────────────────────────────────────
-
+# /users
 @admin_router.message(Command("users"))
 async def cmd_users(message: Message):
-    if not _is_owner(message):
+    if not _is_owner(message.from_user.id):
         return
 
     async with AsyncSessionLocal() as session:
         users = await get_all_users(session)
 
-    if not users:
-        await message.answer("No users yet.", parse_mode="HTML")
+    non_owner = [u for u in users if u.id != cfg.OWNER_CHAT_ID]
+    if not non_owner:
+        builder = InlineKeyboardBuilder()
+        builder.button(text="🏠 Home", callback_data="home:menu")
+        await message.answer(
+            "👥 <b>Users</b>\n\nNo users yet.\n\nAsk them to open the bot and tap Start.",
+            parse_mode="HTML",
+            reply_markup=builder.as_markup(),
+        )
         return
 
-    lines = [f"<b>👥 Members ({len(users)})</b>"]
-    for u in users:
-        name = u.first_name or u.username or "Unknown"
-        username = f" @{u.username}" if u.username else ""
-        if u.id == cfg.OWNER_CHAT_ID:
-            badge = "👑 Owner"
-        elif u.is_premium:
-            badge = "✅ Active"
-        else:
-            badge = "⏳ Pending"
-        lines.append(f"\n{badge}\n<b>{name}</b>{username}\n<code>/approve {u.id}</code>")
+    lines = [f"👥 <b>Users ({len(non_owner)})</b>"]
+    pending = [u for u in non_owner if not getattr(u, "is_invited", False)]
+    approved = [u for u in non_owner if getattr(u, "is_invited", False)]
+    if pending:
+        lines.append(f"\n⏳ <b>Pending ({len(pending)})</b>")
+    if approved:
+        lines.append(f"✅ <b>Approved ({len(approved)})</b>")
+    lines.append("\nInvite, kick, or remove a user.")
 
-    await message.answer("\n".join(lines), parse_mode="HTML")
+    builder = InlineKeyboardBuilder()
+    for u in non_owner:
+        status = "✅" if getattr(u, "is_invited", False) else "⏳"
+        label = u.first_name or u.username or str(u.id)
+        if u.username:
+            label += f" (@{u.username})"
+        builder.button(text=f"✉️ {status} {label}", callback_data=f"approve_user:{u.id}")
+        builder.button(text="🚫 Kick", callback_data=f"kick_user:{u.id}")
+        builder.button(text="🗑️", callback_data=f"delete_user:{u.id}")
+    builder.button(text="🏠 Home", callback_data="home:menu")
+    builder.adjust(*([3] * len(non_owner) + [1]))
+
+    await message.answer("\n".join(lines), parse_mode="HTML", reply_markup=builder.as_markup())
 
 
-# ── /approve ──────────────────────────────────────────────────────────────────
-
+# /approve — direct approve or picker
 @admin_router.message(Command("approve"))
 async def cmd_approve(message: Message):
-    if not _is_owner(message):
-        return
-
-    parts = message.text.split()
-    if len(parts) < 2 or not parts[1].isdigit():
-        await message.answer("Usage: /approve USER_ID", parse_mode="HTML")
-        return
-
-    user_id = int(parts[1])
-    async with AsyncSessionLocal() as session:
-        found = await set_premium(session, user_id, True)
-
-    if found:
-        await message.answer(f"User <code>{user_id}</code> approved.", parse_mode="HTML")
-        try:
-            await message.bot.send_message(
-                user_id,
-                "✅ <b>Access Granted</b>\n\n"
-                "Your request has been approved.\n"
-                "Use /help to see all available commands.",
-                parse_mode="HTML",
-            )
-        except Exception:
-            pass
-    else:
-        await message.answer(f"User <code>{user_id}</code> not found. They must /start the bot first.", parse_mode="HTML")
-
-
-# ── /revoke ───────────────────────────────────────────────────────────────────
-
-@admin_router.message(Command("revoke"))
-async def cmd_revoke(message: Message):
-    if not _is_owner(message):
-        return
-
-    parts = message.text.split()
-    if len(parts) < 2 or not parts[1].isdigit():
-        await message.answer("Usage: /revoke USER_ID", parse_mode="HTML")
-        return
-
-    user_id = int(parts[1])
-    async with AsyncSessionLocal() as session:
-        found = await set_premium(session, user_id, False)
-
-    if found:
-        await message.answer(f"Access revoked for <code>{user_id}</code>.", parse_mode="HTML")
-        try:
-            await message.bot.send_message(
-                user_id,
-                "Your access to CFD Signal Bot has been revoked.",
-                parse_mode="HTML",
-            )
-        except Exception:
-            pass
-    else:
-        await message.answer(f"User <code>{user_id}</code> not found.", parse_mode="HTML")
-
-
-# ── /broadcast ────────────────────────────────────────────────────────────────
-
-@admin_router.message(Command("broadcast"))
-async def cmd_broadcast(message: Message):
-    if not _is_owner(message):
+    if not _is_owner(message.from_user.id):
         return
 
     parts = message.text.split(maxsplit=1)
-    if len(parts) < 2:
-        await message.answer("Usage: /broadcast Your message here", parse_mode="HTML")
+
+    # /approve @username or /approve 123456789
+    if len(parts) == 2:
+        arg = parts[1].strip()
+        from bot.handlers import _send_invite
+        async with AsyncSessionLocal() as session:
+            if arg.startswith("@") or not arg.isdigit():
+                db_user = await get_user_by_username(session, arg)
+            else:
+                from sqlalchemy import select
+                from bot.db.models.user import User
+                result = await session.execute(select(User).where(User.id == int(arg)))
+                db_user = result.scalar_one_or_none()
+
+        if not db_user:
+            await message.answer(
+                f"❌ User <code>{arg}</code> not found. They must start the bot first.",
+                parse_mode="HTML",
+            )
+            return
+
+        display = db_user.first_name or f"@{db_user.username}" or str(db_user.id)
+        try:
+            invite_link = await _send_invite(message.bot, db_user.id)
+            await message.answer(
+                f"✅ <b>Invite sent to {display}</b>\n\n"
+                f"Link (in case they need it manually):\n{invite_link}",
+                parse_mode="HTML",
+            )
+        except Exception as e:
+            await message.answer(f"❌ Failed: <code>{e}</code>", parse_mode="HTML")
         return
 
-    text = parts[1]
+    # /approve with no args — show picker
     async with AsyncSessionLocal() as session:
         users = await get_all_users(session)
 
-    recipients = [u for u in users if u.is_premium or u.id == cfg.OWNER_CHAT_ID]
-    sent = 0
-    for u in recipients:
-        try:
-            await message.bot.send_message(u.id, f"📢 {text}", parse_mode="HTML")
-            sent += 1
-        except Exception:
-            pass
-
-    await message.answer(f"Broadcast sent to <b>{sent}</b> users.", parse_mode="HTML")
-
-
-# ── Approve/Reject via inline buttons (from access requests) ──────────────────
-
-@admin_router.callback_query(F.data.startswith("approve_user:"))
-async def cb_approve_user(callback: CallbackQuery):
-    if callback.from_user.id != cfg.OWNER_CHAT_ID:
-        await callback.answer("Not authorized.", show_alert=True)
+    non_owner = [u for u in users if u.id != cfg.OWNER_CHAT_ID]
+    if not non_owner:
+        builder = InlineKeyboardBuilder()
+        builder.button(text="🏠 Home", callback_data="home:menu")
+        await message.answer("👥 <b>Users</b>\n\nNo users yet. Ask them to open the bot and tap Start.", parse_mode="HTML", reply_markup=builder.as_markup())
         return
 
-    user_id = int(callback.data.split(":")[1])
-    async with AsyncSessionLocal() as session:
-        found = await set_premium(session, user_id, True)
+    builder = InlineKeyboardBuilder()
+    for u in non_owner:
+        status = "✅" if u.is_invited else "⏳"
+        label = u.first_name or u.username or str(u.id)
+        if u.username:
+            label += f" (@{u.username})"
+        builder.button(text=f"✉️ {status} {label}", callback_data=f"approve_user:{u.id}")
+    builder.button(text="🏠 Home", callback_data="home:menu")
+    builder.adjust(1)
 
-    if found:
-        await callback.message.edit_text(
-            callback.message.text + "\n\n✅ <b>Approved</b>",
-            parse_mode="HTML",
-            reply_markup=None,
-        )
-        try:
-            await callback.bot.send_message(
-                user_id,
-                "✅ <b>Access Granted</b>\n\n"
-                "Your request has been approved.\n"
-                "Use /help to get started.",
-                parse_mode="HTML",
-            )
-        except Exception:
-            pass
-    await callback.answer("Access approved.")
-
-
-@admin_router.callback_query(F.data.startswith("reject_user:"))
-async def cb_reject_user(callback: CallbackQuery):
-    if callback.from_user.id != cfg.OWNER_CHAT_ID:
-        await callback.answer("Not authorized.", show_alert=True)
-        return
-
-    user_id = int(callback.data.split(":")[1])
-    await callback.message.edit_text(
-        callback.message.text + "\n\n❌ <b>Rejected</b>",
+    await message.answer(
+        f"👥 <b>Users ({len(non_owner)})</b>\n\nTap a user to send them the channel invite:",
+        reply_markup=builder.as_markup(),
         parse_mode="HTML",
-        reply_markup=None,
     )
-    try:
-        await callback.bot.send_message(
-            user_id,
-            "Sorry, your access request was not approved at this time.",
-        )
-    except Exception:
-        pass
-    await callback.answer("Rejected.")
