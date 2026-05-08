@@ -68,6 +68,7 @@ async def main():
         BotCommand(command="calendar", description="Calendar"),
         BotCommand(command="hours", description="Market hours"),
         BotCommand(command="users", description="Users"),
+        BotCommand(command="admin", description="Admin panel"),
         BotCommand(command="help", description="Help"),
     ]
     await bot.set_my_commands(user_commands, scope=BotCommandScopeDefault())

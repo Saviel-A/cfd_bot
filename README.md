@@ -77,6 +77,7 @@ The bot sends a startup message to the owner on launch.
 | `/stats` | Win rate, TP hits, losses and best/worst symbols |
 | `/history` | Last 20 signals fired |
 | `/symbols` | Browse all 80+ instruments by category |
+| `/admin` | Owner admin panel |
 | `/users` | List users who have messaged the bot |
 | `/chart XAUUSD` | Generate a 1H chart |
 | `/market` | Latest news |
@@ -96,7 +97,7 @@ New Signal
 Timeframe: 1H entry, 4H trend
 Status: Active
 News: Clear
-Market pressure: Buyers 62%
+Pressure: Buyers 62%
 
 Trade Plan
 Entry: 2,345.60
@@ -109,7 +110,8 @@ Setup
 4H trend: Bullish
 EMA: Bullish  MACD: Bullish  RSI: Bullish
 
-Risk distance: distance from entry to Stop Loss: 8.00
+Stop distance: 8.00
+If price reaches SL, the setup is invalid.
 Manage risk. Not financial advice.
 ```
 

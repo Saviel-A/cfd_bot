@@ -44,15 +44,15 @@ def _news_line(news_risk: str, news_events: Optional[list]) -> str:
 
 def _pressure_line(market_pressure: Optional[dict]) -> str:
     if not market_pressure:
-        return "Market pressure: <b>Not checked</b>"
+        return "Pressure: <b>Not checked</b>"
     direction = market_pressure.get("direction", "MIXED").title()
     buy_pct = market_pressure.get("buy_pct", 50)
     sell_pct = market_pressure.get("sell_pct", 50)
     if direction == "Buyers":
-        return f"Market pressure: <b>Buyers {buy_pct:.0f}%</b>"
+        return f"Pressure: <b>Buyers {buy_pct:.0f}%</b>"
     if direction == "Sellers":
-        return f"Market pressure: <b>Sellers {sell_pct:.0f}%</b>"
-    return f"Market pressure: <b>Mixed</b> ({buy_pct:.0f}% buy / {sell_pct:.0f}% sell)"
+        return f"Pressure: <b>Sellers {sell_pct:.0f}%</b>"
+    return f"Pressure: <b>Mixed</b> ({buy_pct:.0f}% buy / {sell_pct:.0f}% sell)"
 
 
 # Signal card
@@ -85,29 +85,30 @@ def format_signal_message(
     rsi = _vote_label(votes.get("RSI", 0))
     news = _news_line(news_risk, news_events)
     pressure = _pressure_line(market_pressure)
-    risk_note = "Risk distance: distance from entry to Stop Loss"
+    risk_note = "Stop distance"
 
     return (
         f"{arrow} <b>{name} {label}</b>\n"
         f"\n"
-        f"<b>New Signal</b>\n"
-        f"Timeframe: <b>1H entry, 4H trend</b>\n"
-        f"Status: <b>Active</b>\n"
-        f"{news}\n"
-        f"{pressure}\n"
+        f"<b>Status:</b> Active\n"
+        f"<b>Timeframe:</b> 1H entry + 4H trend\n"
+        f"{news} | {pressure}\n"
         f"\n"
         f"<b>Trade Plan</b>\n"
         f"Entry: {entry}\n"
         f"Stop Loss: {sl}\n"
-        f"TP1: {tp1}\n"
-        f"TP2: {tp2}\n"
-        f"TP3: {tp3}\n"
+        f"TP1: {tp1}  partial\n"
+        f"TP2: {tp2}  main\n"
+        f"TP3: {tp3}  runner\n"
+        f"\n"
+        f"<b>Risk</b>\n"
+        f"{risk_note}: {risk}\n"
+        f"If price reaches SL, the setup is invalid.\n"
         f"\n"
         f"<b>Setup</b>\n"
         f"4H trend: <b>{signal.htf_bias.title()}</b>\n"
         f"EMA: {ema}  MACD: {macd}  RSI: {rsi}\n"
         f"\n"
-        f"{risk_note}: {risk}\n"
         f"<i>Manage risk. Not financial advice.</i>"
     )
 

@@ -116,6 +116,7 @@ def _commands_text(name: str) -> str:
         "/calendar  Calendar\n"
         "/hours  Market hours\n\n"
         "<b>Subscribers</b>\n"
+        "/admin  Admin panel\n"
         "/users  Users"
     )
 
@@ -420,12 +421,17 @@ async def cb_home(callback: CallbackQuery):
         pending   = [u for u in non_owner if not getattr(u, 'is_invited', False)]
         approved  = [u for u in non_owner if getattr(u, 'is_invited', False)]
 
-        lines = [f"👥 <b>Users ({len(non_owner)})</b>"]
-        if pending:
-            lines.append(f"\n⏳ <b>Pending ({len(pending)})</b>")
-        if approved:
-            lines.append(f"✅ <b>Approved ({len(approved)})</b>")
-        lines.append("\nInvite, kick, or remove a user.")
+        lines = [f"👥 <b>Users ({len(non_owner)})</b>", ""]
+        lines.append(f"Pending: <b>{len(pending)}</b>")
+        lines.append(f"Invited: <b>{len(approved)}</b>")
+        lines.append("")
+        lines.append("Tap Invite, Kick, or Delete below.")
+        for u in non_owner[:12]:
+            status = "✅" if getattr(u, 'is_invited', False) else "⏳"
+            label = u.first_name or u.username or str(u.id)
+            if u.username:
+                label += f" (@{u.username})"
+            lines.append(f"{status} {label}")
 
         builder = InlineKeyboardBuilder()
         for u in non_owner:
@@ -433,9 +439,9 @@ async def cb_home(callback: CallbackQuery):
             label = u.first_name or u.username or str(u.id)
             if u.username:
                 label += f" (@{u.username})"
-            builder.button(text=f"✉️ {status} {label}", callback_data=f"approve_user:{u.id}")
+            builder.button(text=f"{status} {label}", callback_data=f"approve_user:{u.id}")
             builder.button(text="🚫 Kick", callback_data=f"kick_user:{u.id}")
-            builder.button(text="🗑️", callback_data=f"delete_user:{u.id}")
+            builder.button(text="🗑 Delete", callback_data=f"delete_user:{u.id}")
         builder.button(text="🏠 Home", callback_data="home:menu")
         builder.adjust(*([3] * len(non_owner) + [1]))
         await callback.message.edit_text(
