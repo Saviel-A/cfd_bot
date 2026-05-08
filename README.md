@@ -77,41 +77,40 @@ The bot sends a startup message to the owner on launch.
 | `/stats` | Win rate, TP hits, losses and best/worst symbols |
 | `/history` | Last 20 signals fired |
 | `/symbols` | Browse all 80+ instruments by category |
-| `/admin` | Owner admin panel |
 | `/users` | List users who have messaged the bot |
+| `/approve` | Send a private channel invite to a subscriber |
 | `/chart XAUUSD` | Generate a 1H chart |
 | `/market` | Latest news |
 | `/calendar` | Economic calendar |
 | `/hours` | Market session times in Israel time |
 
-### Users (non-owner)
+### Subscribers (non-owner)
 
-Users see a subscribe screen when they open the bot. They pay via Telegram Stars for access to the private channel where signals are broadcast.
+Subscribers see a subscribe screen when they open the bot. They pay via Telegram Stars for access to the private channel where signals are broadcast.
 
 ## Signal Format
 
 ```
 📈 XAUUSD: Gold BUY
 
-New Signal
-Timeframe: 1H entry, 4H trend
-Status: Active
-News: Clear
-Pressure: Buyers 62%
+🟢 Status: Active
+⏱ Timeframe: 1H entry + 4H trend
+📰 News: Clear
+⚖️ Pressure: Buyers 62%
 
-Trade Plan
-Entry: 2,345.60
-Stop Loss: 2,337.60
-TP1: 2,357.60 partial
-TP2: 2,361.60 main
-TP3: 2,369.60 runner
+📌 Trade Plan
+💰 Entry: 2,345.60
+🛑 Stop Loss: 2,337.60
+🎯 TP1: 2,357.60 partial
+🎯 TP2: 2,361.60 main
+🎯 TP3: 2,369.60 runner
 
-Risk
+⚠️ Risk
 Risk to SL: 8.00
 This is the price gap between Entry and Stop Loss.
 If SL is hit, close the trade.
 
-Setup
+🧠 Setup
 4H trend: Bullish
 EMA: Bullish  MACD: Bullish  RSI: Bullish
 Manage risk. Not financial advice.

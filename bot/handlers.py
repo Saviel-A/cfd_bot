@@ -1,7 +1,7 @@
 """
 Telegram handlers.
-- Owner: admin commands with back navigation
-- Users: welcome → subscribe → pay Stars → get channel invite
+- Owner: command console with back navigation
+- Subscribers: welcome -> subscribe -> pay Stars -> get channel invite
 """
 
 import asyncio
@@ -64,19 +64,19 @@ def _menu_markup():
 
 def _menu_markup_main():
     builder = InlineKeyboardBuilder()
-    builder.button(text="🔔 Signal",      callback_data="home:signal")
-    builder.button(text="📡 Scan Now",    callback_data="home:scan")
-    builder.button(text="📊 Chart",       callback_data="home:chart")
-    builder.button(text="📊 Stats",       callback_data="home:stats")
-    builder.button(text="📜 History",     callback_data="home:history")
-    builder.button(text="📋 Watchlist",   callback_data="home:watchlist")
-    builder.button(text="➕ Add Symbol",  callback_data="home:symbols")
-    builder.button(text="➖ Remove",      callback_data="home:remove")
-    builder.button(text="📰 News",        callback_data="home:market")
-    builder.button(text="📅 Calendar",    callback_data="home:calendar")
-    builder.button(text="🕐 Hours",       callback_data="home:hours")
-    builder.button(text="👥 Users",       callback_data="home:users")
-    builder.button(text="📲 Share Link",  callback_data="home:sharelink")
+    builder.button(text="🔔 Check Signal", callback_data="home:signal")
+    builder.button(text="📡 Scan Channel", callback_data="home:scan")
+    builder.button(text="📊 Chart",        callback_data="home:chart")
+    builder.button(text="📈 Performance",  callback_data="home:stats")
+    builder.button(text="📜 History",      callback_data="home:history")
+    builder.button(text="📋 Watchlist",    callback_data="home:watchlist")
+    builder.button(text="➕ Add Symbol",   callback_data="home:symbols")
+    builder.button(text="➖ Remove Symbol", callback_data="home:remove")
+    builder.button(text="📰 News",         callback_data="home:market")
+    builder.button(text="📅 Calendar",     callback_data="home:calendar")
+    builder.button(text="🕐 Market Hours", callback_data="home:hours")
+    builder.button(text="👥 Subscribers",  callback_data="home:users")
+    builder.button(text="📲 Share Link",   callback_data="home:sharelink")
     builder.adjust(2)
     return builder.as_markup()
 
@@ -96,29 +96,29 @@ def set_bot_username(username: str):
 
 def _commands_text(name: str) -> str:
     return (
-        f"🤖 <b>CFD Signal Bot</b>\n\n"
+        f"🤖 <b>CFD Signal Bot Owner Console</b>\n\n"
         f"👋 Welcome back, <b>{name}</b>!\n\n"
         "Automated multi-timeframe signals for Forex, Gold and Indices. "
-        "Signals only fire when 4H trend and 1H confirmation agree.\n\n"
-        "<b>Signals</b>\n"
-        "/signal XAUUSD  Check setup\n"
-        "/scan  Scan watchlist\n"
-        "/chart XAUUSD  Chart\n\n"
-        "<b>Performance</b>\n"
-        "/stats  Performance\n"
-        "/history  Signal history\n\n"
-        "<b>Watchlist</b>\n"
-        "/watchlist  View symbols\n"
+        "Alerts fire only when trend, indicators, pressure, news, and market hours pass.\n\n"
+        "🔔 <b>Signals</b>\n"
+        "/signal XAUUSD  Check one symbol\n"
+        "/scan  Scan watchlist and post valid alerts\n"
+        "/chart XAUUSD  Send chart preview\n\n"
+        "📈 <b>Performance</b>\n"
+        "/stats  Full performance summary\n"
+        "/history  Signal history and outcomes\n\n"
+        "📋 <b>Watchlist</b>\n"
+        "/watchlist  View active symbols\n"
         "/symbols  Browse instruments\n"
         "/add XAUUSD  Add symbol\n"
         "/remove XAUUSD  Remove symbol\n\n"
-        "<b>Market Info</b>\n"
-        "/market  News\n"
-        "/calendar  Calendar\n"
-        "/hours  Market hours\n\n"
-        "<b>Subscribers</b>\n"
-        "/admin  Admin panel\n"
-        "/users  Users"
+        "📰 <b>Market Info</b>\n"
+        "/market  Latest news\n"
+        "/calendar  Economic calendar\n"
+        "/hours  Market hours in Israel time\n\n"
+        "👥 <b>Subscribers</b>\n"
+        "/users  Manage subscribers\n"
+        "/approve  Invite subscriber"
     )
 
 
@@ -262,12 +262,12 @@ async def cb_home(callback: CallbackQuery):
             builder.button(text="🏠 Home", callback_data="home:menu")
             builder.adjust(1)
             await callback.message.edit_text(
-                "📋 <b>Watchlist</b>\n\nNo symbols yet. Add your first symbol.",
+                "📋 <b>Watchlist</b>\n\nNo symbols are tracked yet.\nAdd your first symbol to start scanning.",
                 parse_mode="HTML", reply_markup=builder.as_markup(),
             )
             return
 
-        await callback.message.edit_text("🔍 Scanning watchlist, please wait...", parse_mode="HTML")
+        await callback.message.edit_text("🔍 <b>Scanning watchlist</b>\n\nChecking each symbol for a clean setup...", parse_mode="HTML")
         results = []
         for symbol in watchlist:
             try:
@@ -294,7 +294,7 @@ async def cb_home(callback: CallbackQuery):
         builder.button(text="🏠 Home",       callback_data="home:menu")
         builder.adjust(3)
         await callback.message.edit_text(
-            "🔔 <b>Signal</b>\n\n" + ("Choose a symbol from your watchlist:" if watchlist else "Your watchlist is empty. Add a symbol first."),
+            "🔔 <b>Check Signal</b>\n\n" + ("Choose a symbol from your watchlist:" if watchlist else "Your watchlist is empty. Add a symbol first."),
             parse_mode="HTML", reply_markup=builder.as_markup(),
         )
 
@@ -310,7 +310,7 @@ async def cb_home(callback: CallbackQuery):
         builder.button(text="🏠 Home", callback_data="home:menu")
         builder.adjust(3)
         await callback.message.edit_text(
-            "📰 <b>News</b>\n\n" + ("Choose a symbol:" if watchlist else "Watchlist is empty. Add a symbol first."),
+            "📰 <b>Market News</b>\n\n" + ("Choose a symbol to see recent headlines:" if watchlist else "Watchlist is empty. Add a symbol first."),
             parse_mode="HTML", reply_markup=builder.as_markup(),
         )
 
@@ -322,7 +322,7 @@ async def cb_home(callback: CallbackQuery):
         builder.button(text="🏠 Home",      callback_data="home:menu")
         builder.adjust(2, 1)
         await callback.message.edit_text(
-            "📅 <b>Economic Calendar</b>\n\nChoose a period:",
+            "📅 <b>Economic Calendar</b>\n\nChoose which events to show:",
             parse_mode="HTML", reply_markup=builder.as_markup(),
         )
 
@@ -334,7 +334,7 @@ async def cb_home(callback: CallbackQuery):
         builder.button(text="🏠 Home", callback_data="home:menu")
         builder.adjust(2)
         await callback.message.edit_text(
-            "🔎 <b>Instruments</b>\n\nChoose a category:",
+            "🔎 <b>Instruments</b>\n\nChoose a market category:",
             parse_mode="HTML", reply_markup=builder.as_markup(),
         )
 
@@ -348,7 +348,7 @@ async def cb_home(callback: CallbackQuery):
         builder.button(text="🏠 Home",       callback_data="home:menu")
         builder.adjust(3)
         await callback.message.edit_text(
-            "📊 <b>Chart</b>\n\nChoose a symbol:",
+            "📊 <b>Chart</b>\n\nChoose a symbol to generate a 1H chart:",
             parse_mode="HTML", reply_markup=builder.as_markup(),
         )
 
@@ -370,7 +370,7 @@ async def cb_home(callback: CallbackQuery):
             async with AsyncSessionLocal() as session:
                 count = await clear_all_signals(session)
             await callback.message.edit_text(
-                f"🗑 <b>History cleared</b>: {count} signal(s) deleted.",
+                f"🗑 <b>History Cleared</b>\n\nDeleted signals: <b>{count}</b>",
                 parse_mode="HTML",
                 reply_markup=InlineKeyboardBuilder().button(text="🏠 Home", callback_data="home:menu").as_markup(),
             )
@@ -402,7 +402,7 @@ async def cb_home(callback: CallbackQuery):
             format_stats_message(stats), parse_mode="HTML", reply_markup=builder.as_markup(),
         )
 
-    # Users
+    # Subscribers
     elif action == "users":
         from bot.db.repositories.user_repo import get_all_users
         async with AsyncSessionLocal() as session:
@@ -414,7 +414,7 @@ async def cb_home(callback: CallbackQuery):
             builder = InlineKeyboardBuilder()
             builder.button(text="🏠 Home", callback_data="home:menu")
             await callback.message.edit_text(
-                "👥 <b>Users</b>\n\nNo users yet.\n\nAsk them to open the bot and tap Start.",
+                "👥 <b>Subscribers</b>\n\nNo users yet.\nAsk them to open the bot and tap Start.",
                 parse_mode="HTML", reply_markup=builder.as_markup(),
             )
             return
@@ -422,11 +422,11 @@ async def cb_home(callback: CallbackQuery):
         pending   = [u for u in non_owner if not getattr(u, 'is_invited', False)]
         approved  = [u for u in non_owner if getattr(u, 'is_invited', False)]
 
-        lines = [f"👥 <b>Users ({len(non_owner)})</b>", ""]
+        lines = [f"👥 <b>Subscribers</b>", f"Total users: <b>{len(non_owner)}</b>", ""]
         lines.append(f"Pending: <b>{len(pending)}</b>")
         lines.append(f"Invited: <b>{len(approved)}</b>")
         lines.append("")
-        lines.append("Tap Invite, Kick, or Delete below.")
+        lines.append("Use the buttons below to invite, kick, or delete a user.")
         for u in non_owner[:12]:
             status = "✅" if getattr(u, 'is_invited', False) else "⏳"
             label = u.first_name or u.username or str(u.id)
@@ -459,7 +459,7 @@ async def cb_home(callback: CallbackQuery):
             builder.button(text=f"❌ {get_symbol_label(s)}", callback_data=f"remove_sym:{s}")
         builder.button(text="🏠 Home", callback_data="home:menu")
         builder.adjust(3)
-        text = "➖ <b>Remove Symbol</b>\n\nTap a symbol to remove it:" if watchlist else "➖ <b>Remove Symbol</b>\n\nWatchlist is empty."
+        text = "➖ <b>Remove Symbol</b>\n\nTap a symbol to remove it from the watchlist:" if watchlist else "➖ <b>Remove Symbol</b>\n\nWatchlist is empty."
         await callback.message.edit_text(text, parse_mode="HTML", reply_markup=builder.as_markup())
 
     # Approve
@@ -474,7 +474,7 @@ async def cb_home(callback: CallbackQuery):
             builder.button(text=label, callback_data=f"approve_user:{u.id}")
         builder.button(text="🏠 Home", callback_data="home:menu")
         builder.adjust(2)
-        text = "✉️ <b>Invite User</b>\n\nTap a user to send them the channel invite:" if non_owner else "✉️ <b>Invite User</b>\n\nNo users yet."
+        text = "✉️ <b>Invite Subscriber</b>\n\nTap a user to send them a private channel invite:" if non_owner else "✉️ <b>Invite Subscriber</b>\n\nNo users yet."
         await callback.message.edit_text(text, parse_mode="HTML", reply_markup=builder.as_markup())
 
     # Share Link
@@ -489,9 +489,9 @@ async def cb_home(callback: CallbackQuery):
             builder.button(text="🏠 Home", callback_data="home:menu")
             builder.adjust(1)
             await callback.message.edit_text(
-                f"📲 <b>Share with subscribers:</b>\n\n"
+                f"📲 <b>Subscriber Link</b>\n\n"
                 f"<code>{link}</code>\n\n"
-                "Tap the button below to send it directly to someone in Telegram.",
+                "Tap the button below to share it directly in Telegram.",
                 parse_mode="HTML", reply_markup=builder.as_markup(),
             )
         else:
@@ -508,7 +508,7 @@ async def cb_home(callback: CallbackQuery):
         from src.trading_hours import symbol_market_status
         market_open = _market_open_now()
         await callback.message.edit_text(
-            "📡 Scanning and broadcasting..." if market_open else "🔴 Market closed. Broadcasting status...",
+            "📡 <b>Scanning Channel Watchlist</b>\n\nChecking for valid alerts to broadcast..." if market_open else "🔴 <b>Market Closed</b>\n\nSending market status updates instead of trade alerts...",
             parse_mode="HTML",
         )
         async with AsyncSessionLocal() as session:
@@ -587,9 +587,12 @@ async def cmd_watchlist(message: Message):
         builder.button(text="➕ Add Symbol", callback_data="home:symbols")
         builder.button(text="🏠 Home", callback_data="home:menu")
         builder.adjust(1)
-        await message.answer("📋 <b>Watchlist</b>\n\nNo symbols yet. Add your first symbol.", parse_mode="HTML", reply_markup=builder.as_markup())
+        await message.answer(
+            "📋 <b>Watchlist</b>\n\nNo symbols are tracked yet.\nAdd your first symbol to start scanning.",
+            parse_mode="HTML", reply_markup=builder.as_markup(),
+        )
         return
-    await message.answer("🔍 Scanning watchlist...", parse_mode="HTML")
+    await message.answer("🔍 <b>Scanning watchlist</b>\n\nChecking each symbol for a clean setup...", parse_mode="HTML")
     results = []
     for symbol in watchlist:
         try:
@@ -614,15 +617,21 @@ async def cmd_add(message: Message):
         builder.button(text="➕ Add Symbol", callback_data="home:symbols")
         builder.button(text="🏠 Home", callback_data="home:menu")
         builder.adjust(1)
-        await message.answer("➕ <b>Add Symbol</b>\n\nUse: <code>/add XAUUSD</code>", parse_mode="HTML", reply_markup=builder.as_markup())
+        await message.answer(
+            "➕ <b>Add Symbol</b>\n\n"
+            "Send a symbol like:\n"
+            "<code>/add XAUUSD</code>\n\n"
+            "You can also browse instruments with the button below.",
+            parse_mode="HTML", reply_markup=builder.as_markup(),
+        )
         return
     symbol = parts[1].upper()
     async with AsyncSessionLocal() as session:
         added = await add_symbol(session, cfg.OWNER_CHAT_ID, symbol)
     if added:
-        await message.answer(f"✅ <b>{get_symbol_label(symbol)}</b> added to watchlist.", parse_mode="HTML", reply_markup=_menu_markup())
+        await message.answer(f"✅ <b>{get_symbol_label(symbol)}</b>\n\nAdded to the watchlist.", parse_mode="HTML", reply_markup=_menu_markup())
     else:
-        await message.answer(f"<b>{get_symbol_label(symbol)}</b> is already in the watchlist.", parse_mode="HTML", reply_markup=_menu_markup())
+        await message.answer(f"ℹ️ <b>{get_symbol_label(symbol)}</b>\n\nThis symbol is already in the watchlist.", parse_mode="HTML", reply_markup=_menu_markup())
 
 
 # /remove
@@ -638,16 +647,20 @@ async def cmd_remove(message: Message):
             builder.button(text=f"❌ {get_symbol_label(s)}", callback_data=f"remove_sym:{s}")
         builder.button(text="🏠 Home", callback_data="home:menu")
         builder.adjust(3)
-        text = "➖ <b>Remove Symbol</b>\n\nTap a symbol or use: <code>/remove XAUUSD</code>" if watchlist else "➖ <b>Remove Symbol</b>\n\nWatchlist is empty."
+        text = (
+            "➖ <b>Remove Symbol</b>\n\nTap a symbol or send:\n<code>/remove XAUUSD</code>"
+            if watchlist else
+            "➖ <b>Remove Symbol</b>\n\nWatchlist is empty."
+        )
         await message.answer(text, parse_mode="HTML", reply_markup=builder.as_markup())
         return
     symbol = parts[1].upper()
     async with AsyncSessionLocal() as session:
         removed = await remove_symbol(session, cfg.OWNER_CHAT_ID, symbol)
     if removed:
-        await message.answer(f"✅ <b>{get_symbol_label(symbol)}</b> removed.", parse_mode="HTML", reply_markup=_menu_markup())
+        await message.answer(f"✅ <b>{get_symbol_label(symbol)}</b>\n\nRemoved from the watchlist.", parse_mode="HTML", reply_markup=_menu_markup())
     else:
-        await message.answer(f"<b>{get_symbol_label(symbol)}</b> was not in your watchlist.", parse_mode="HTML", reply_markup=_menu_markup())
+        await message.answer(f"ℹ️ <b>{get_symbol_label(symbol)}</b>\n\nThis symbol was not in your watchlist.", parse_mode="HTML", reply_markup=_menu_markup())
 
 
 @router.callback_query(F.data.startswith("remove_sym:"))
@@ -669,8 +682,8 @@ async def cb_remove_symbol(callback: CallbackQuery):
         builder.button(text="🏠 Home", callback_data="home:menu")
         builder.adjust(3)
         text = (
-            f"✅ <b>{get_symbol_label(symbol)}</b> removed.\n\n"
-            + ("➖ <b>Remove Symbol</b>\n\nTap a symbol to remove it:" if watchlist else "Watchlist is now empty.")
+            f"✅ <b>{get_symbol_label(symbol)}</b>\n\nRemoved from the watchlist.\n\n"
+            + ("➖ <b>Remove Symbol</b>\n\nTap another symbol to remove it:" if watchlist else "Watchlist is now empty.")
         )
         await callback.message.edit_text(text, parse_mode="HTML", reply_markup=builder.as_markup())
     else:
@@ -728,7 +741,8 @@ async def cb_approve_user(callback: CallbackQuery):
 
     if not cfg.BROADCAST_CHANNEL_ID:
         await callback.message.edit_text(
-            "❌ BROADCAST_CHANNEL_ID is not set in .env",
+            "❌ <b>Channel Not Configured</b>\n\n"
+            "Set <code>BROADCAST_CHANNEL_ID</code> in <code>.env</code>.",
             parse_mode="HTML", reply_markup=builder.as_markup(),
         )
         return
@@ -747,8 +761,9 @@ async def cb_approve_user(callback: CallbackQuery):
         )
     except Exception as e:
         await callback.message.edit_text(
-            f"❌ <b>Could not create invite link</b>\n\n<code>{e}</code>\n\n"
-            "Make sure the bot is an admin in the channel with <b>Invite Users</b> permission.",
+            f"❌ <b>Invite Failed</b>\n\n"
+            f"Reason: <code>{e}</code>\n\n"
+            "Check that the bot has <b>Invite Users</b> permission in the channel.",
             parse_mode="HTML", reply_markup=builder.as_markup(),
         )
 
@@ -778,7 +793,8 @@ async def cb_kick_user(callback: CallbackQuery):
 
     if not cfg.BROADCAST_CHANNEL_ID:
         await callback.message.edit_text(
-            "❌ BROADCAST_CHANNEL_ID is not set in .env",
+            "❌ <b>Channel Not Configured</b>\n\n"
+            "Set <code>BROADCAST_CHANNEL_ID</code> in <code>.env</code>.",
             parse_mode="HTML", reply_markup=builder.as_markup(),
         )
         return
@@ -805,8 +821,8 @@ async def cb_kick_user(callback: CallbackQuery):
     except Exception as e:
         await callback.message.edit_text(
             f"⚠️ <b>{display}</b> removed from approved list.\n\n"
-            f"Could not remove from channel: <code>{e}</code>\n\n"
-            "Make sure the bot is an admin with <b>Ban Users</b> permission.",
+            f"Channel removal failed: <code>{e}</code>\n\n"
+            "Check that the bot has <b>Ban Users</b> permission in the channel.",
             parse_mode="HTML", reply_markup=builder.as_markup(),
         )
 
@@ -844,7 +860,8 @@ async def cb_delete_user(callback: CallbackQuery):
         )
     else:
         await callback.message.edit_text(
-            f"❌ User not found.", parse_mode="HTML", reply_markup=builder.as_markup(),
+            "❌ <b>User Not Found</b>\n\nThey may have already been deleted.",
+            parse_mode="HTML", reply_markup=builder.as_markup(),
         )
 
 
@@ -862,12 +879,15 @@ async def cmd_signal(message: Message):
         builder.button(text="🏠 Home",       callback_data="home:menu")
         builder.adjust(3)
         await message.answer(
-            "🔔 <b>Signal</b>\n\n" + ("Choose a symbol:" if watchlist else "Watchlist is empty. Add a symbol first."),
+            "🔔 <b>Check Signal</b>\n\n" + ("Choose a symbol from your watchlist:" if watchlist else "Watchlist is empty. Add a symbol first."),
             parse_mode="HTML", reply_markup=builder.as_markup(),
         )
         return
     symbol = parts[1].upper()
-    msg    = await message.answer(f"🔍 Scanning <b>{symbol}</b>...", parse_mode="HTML")
+    msg    = await message.answer(
+        f"🔍 <b>Scanning {symbol}</b>\n\nChecking trend, indicators, pressure, news, and market hours...",
+        parse_mode="HTML",
+    )
     try:
         symbol_open, _ = symbol_market_status(symbol)
         if not symbol_open:
@@ -907,7 +927,7 @@ async def cmd_signal(message: Message):
         except Exception:
             await msg.edit_text(text, parse_mode="HTML", reply_markup=_menu_markup())
     except Exception as e:
-        await msg.edit_text(f"❌ Could not scan <b>{symbol}</b>: {e}", parse_mode="HTML", reply_markup=_menu_markup())
+        await msg.edit_text(f"❌ <b>Scan Failed</b>\n\nSymbol: <b>{symbol}</b>\nReason: <code>{e}</code>", parse_mode="HTML", reply_markup=_menu_markup())
 
 
 @router.callback_query(F.data.startswith("scan_sym:"))
@@ -917,7 +937,10 @@ async def cb_scan_symbol(callback: CallbackQuery):
         return
     symbol = callback.data.split(":")[1]
     await callback.answer()
-    await callback.message.edit_text(f"🔍 Scanning <b>{symbol}</b>...", parse_mode="HTML")
+    await callback.message.edit_text(
+        f"🔍 <b>Scanning {symbol}</b>\n\nChecking trend, indicators, pressure, news, and market hours...",
+        parse_mode="HTML",
+    )
     try:
         symbol_open, _ = symbol_market_status(symbol)
         if not symbol_open:
@@ -957,7 +980,7 @@ async def cb_scan_symbol(callback: CallbackQuery):
         except Exception:
             await callback.message.edit_text(text, parse_mode="HTML", reply_markup=_menu_markup())
     except Exception as e:
-        await callback.message.edit_text(f"❌ Could not scan <b>{symbol}</b>: {e}", parse_mode="HTML", reply_markup=_menu_markup())
+        await callback.message.edit_text(f"❌ <b>Scan Failed</b>\n\nSymbol: <b>{symbol}</b>\nReason: <code>{e}</code>", parse_mode="HTML", reply_markup=_menu_markup())
 
 
 # /market
@@ -973,7 +996,11 @@ async def cmd_market(message: Message):
         builder.button(text="➕ Add Symbol", callback_data="home:symbols")
     builder.button(text="🏠 Home", callback_data="home:menu")
     builder.adjust(3)
-    text = "📰 <b>News</b>\n\nChoose a symbol:" if watchlist else "📰 <b>News</b>\n\nWatchlist is empty. Add a symbol first."
+    text = (
+        "📰 <b>Market News</b>\n\nChoose a symbol to see recent headlines:"
+        if watchlist else
+        "📰 <b>Market News</b>\n\nWatchlist is empty. Add a symbol first."
+    )
     await message.answer(text, parse_mode="HTML", reply_markup=builder.as_markup())
 
 
@@ -999,7 +1026,11 @@ async def cb_news_symbol(callback: CallbackQuery):
             reply_markup=builder.as_markup(),
         )
     except Exception as e:
-        await callback.message.edit_text(f"❌ Could not fetch news: {e}", parse_mode="HTML", reply_markup=_menu_markup())
+        await callback.message.edit_text(
+            f"❌ <b>News Unavailable</b>\n\nSymbol: <b>{symbol}</b>\nReason: <code>{e}</code>",
+            parse_mode="HTML",
+            reply_markup=_menu_markup(),
+        )
 
 
 @router.callback_query(F.data.startswith("calendar:"))
@@ -1010,7 +1041,7 @@ async def cb_calendar(callback: CallbackQuery):
     mode       = callback.data.split(":")[1]
     today_only = mode == "today"
     await callback.answer("Fetching...")
-    await callback.message.edit_text("📅 Fetching calendar...", parse_mode="HTML")
+    await callback.message.edit_text("📅 <b>Fetching calendar</b>\n\nLoading economic events...", parse_mode="HTML")
     loop   = asyncio.get_running_loop()
     events = await loop.run_in_executor(None, lambda: get_calendar(today_only=today_only))
 
@@ -1039,7 +1070,7 @@ async def cmd_calendar(message: Message):
     builder.button(text="🏠 Home",      callback_data="home:menu")
     builder.adjust(2, 1)
     await message.answer(
-        "📅 <b>Economic Calendar</b>\n\nChoose a period:",
+        "📅 <b>Economic Calendar</b>\n\nChoose which events to show:",
         parse_mode="HTML",
         reply_markup=builder.as_markup(),
     )
@@ -1179,12 +1210,12 @@ async def cmd_chart(message: Message):
         builder.button(text="🏠 Home",       callback_data="home:menu")
         builder.adjust(3)
         await message.answer(
-            "📊 <b>Chart</b>\n\nChoose a symbol:",
+            "📊 <b>Chart</b>\n\nChoose a symbol to generate a 1H chart:",
             parse_mode="HTML", reply_markup=builder.as_markup(),
         )
         return
     symbol = parts[1].upper()
-    msg = await message.answer(f"📊 Generating chart for <b>{symbol}</b>...", parse_mode="HTML")
+    msg = await message.answer(f"📊 <b>Generating Chart</b>\n\nSymbol: <b>{symbol}</b>\nTimeframe: <b>1H</b>", parse_mode="HTML")
     try:
         loop  = asyncio.get_running_loop()
         buf   = await loop.run_in_executor(None, lambda: generate_chart(symbol))
@@ -1192,12 +1223,12 @@ async def cmd_chart(message: Message):
         await msg.delete()
         await message.answer_photo(
             BufferedInputFile(buf.read(), filename=f"{symbol}_1h.png"),
-            caption=f"📊 <b>{get_symbol_label(symbol)}</b>\n1H Chart",
+            caption=f"📊 <b>{get_symbol_label(symbol)}</b>\nTimeframe: <b>1H</b>",
             parse_mode="HTML",
             reply_markup=_menu_markup(),
         )
     except Exception as e:
-        await msg.edit_text(f"❌ Could not generate chart for <b>{symbol}</b>: {e}", parse_mode="HTML", reply_markup=_menu_markup())
+        await msg.edit_text(f"❌ <b>Chart Failed</b>\n\nSymbol: <b>{symbol}</b>\nReason: <code>{e}</code>", parse_mode="HTML", reply_markup=_menu_markup())
 
 
 @router.callback_query(F.data.startswith("chart_sym:"))
@@ -1207,7 +1238,7 @@ async def cb_chart_symbol(callback: CallbackQuery):
         return
     symbol = callback.data.split(":")[1]
     await callback.answer()
-    await callback.message.edit_text(f"📊 Generating chart for <b>{symbol}</b>...", parse_mode="HTML")
+    await callback.message.edit_text(f"📊 <b>Generating Chart</b>\n\nSymbol: <b>{symbol}</b>\nTimeframe: <b>1H</b>", parse_mode="HTML")
     try:
         loop  = asyncio.get_running_loop()
         buf   = await loop.run_in_executor(None, lambda: generate_chart(symbol))
@@ -1215,12 +1246,12 @@ async def cb_chart_symbol(callback: CallbackQuery):
         await callback.message.delete()
         await callback.message.answer_photo(
             BufferedInputFile(buf.read(), filename=f"{symbol}_1h.png"),
-            caption=f"📊 <b>{get_symbol_label(symbol)}</b>\n1H Chart",
+            caption=f"📊 <b>{get_symbol_label(symbol)}</b>\nTimeframe: <b>1H</b>",
             parse_mode="HTML",
             reply_markup=_menu_markup(),
         )
     except Exception as e:
-        await callback.message.edit_text(f"❌ Could not generate chart for <b>{symbol}</b>: {e}", parse_mode="HTML", reply_markup=_menu_markup())
+        await callback.message.edit_text(f"❌ <b>Chart Failed</b>\n\nSymbol: <b>{symbol}</b>\nReason: <code>{e}</code>", parse_mode="HTML", reply_markup=_menu_markup())
 
 
 # Instrument browser
@@ -1232,7 +1263,7 @@ async def cmd_symbols(message: Message):
         builder.button(text=category, callback_data=f"cat:{category}")
     builder.button(text="🏠 Home", callback_data="home:menu")
     builder.adjust(2)
-    await message.answer("🔎 <b>Instruments</b>\n\nChoose a category:", parse_mode="HTML", reply_markup=builder.as_markup())
+    await message.answer("🔎 <b>Instruments</b>\n\nChoose a market category:", parse_mode="HTML", reply_markup=builder.as_markup())
 
 
 @router.callback_query(F.data.startswith("cat:"))
@@ -1253,7 +1284,7 @@ async def cb_category(callback: CallbackQuery):
     builder.button(text="↩ Back", callback_data="home:symbols")
     builder.adjust(1)
     await callback.message.edit_text(
-        f"<b>{category}</b>\n\nTap a symbol to add it. ✅ Already added.",
+        f"🔎 <b>{category}</b>\n\nTap a symbol to add it.\n✅ Already in watchlist.",
         parse_mode="HTML", reply_markup=builder.as_markup(),
     )
     await callback.answer()
@@ -1292,7 +1323,7 @@ async def cb_quickadd(callback: CallbackQuery):
             builder.button(text="↩ Back", callback_data="home:symbols")
             builder.adjust(1)
             await callback.message.edit_text(
-                f"<b>{category}</b>\n\nTap a symbol to add it. ✅ Already added.",
+                f"🔎 <b>{category}</b>\n\nTap a symbol to add it.\n✅ Already in watchlist.",
                 parse_mode="HTML", reply_markup=builder.as_markup(),
             )
     else:
@@ -1306,7 +1337,7 @@ async def cb_refresh_watchlist(callback: CallbackQuery):
         await callback.answer()
         return
     await callback.answer("Refreshing...")
-    await callback.message.edit_text("🔍 Scanning watchlist, please wait...", parse_mode="HTML")
+    await callback.message.edit_text("🔍 <b>Refreshing Watchlist</b>\n\nChecking each symbol again...", parse_mode="HTML")
     async with AsyncSessionLocal() as session:
         watchlist = await get_watchlist(session, cfg.OWNER_CHAT_ID)
     results = []

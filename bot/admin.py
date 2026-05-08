@@ -1,7 +1,6 @@
 """
-Admin commands: owner only.
+Owner subscriber commands.
 
-/admin         : owner control panel
 /users         : list all users who have messaged the bot
 /approve       : pick a user from a list, or /approve @username / /approve ID
 """
@@ -40,43 +39,6 @@ def _user_status(user) -> str:
     return "Pending"
 
 
-# /admin
-@admin_router.message(Command("admin"))
-async def cmd_admin(message: Message):
-    if not _is_owner(message.from_user.id):
-        return
-
-    async with AsyncSessionLocal() as session:
-        users = await get_all_users(session)
-
-    non_owner = [u for u in users if u.id != cfg.OWNER_CHAT_ID]
-    pending = sum(1 for u in non_owner if not getattr(u, "is_invited", False))
-    invited = sum(1 for u in non_owner if getattr(u, "is_invited", False))
-
-    builder = InlineKeyboardBuilder()
-    builder.button(text="👥 Users", callback_data="home:users")
-    builder.button(text="✉️ Invite", callback_data="home:approve")
-    builder.button(text="📊 Stats", callback_data="home:stats")
-    builder.button(text="📜 History", callback_data="home:history")
-    builder.button(text="📲 Share Link", callback_data="home:sharelink")
-    builder.button(text="🏠 Home", callback_data="home:menu")
-    builder.adjust(2)
-
-    await message.answer(
-        "⚙️ <b>Admin Panel</b>\n\n"
-        f"Users: <b>{len(non_owner)}</b>\n"
-        f"Pending: <b>{pending}</b>\n"
-        f"Invited: <b>{invited}</b>\n\n"
-        "<b>Commands</b>\n"
-        "/users  Manage subscribers\n"
-        "/approve @username  Send invite\n"
-        "/stats  Performance\n"
-        "/history  Signal history",
-        parse_mode="HTML",
-        reply_markup=builder.as_markup(),
-    )
-
-
 # /users
 @admin_router.message(Command("users"))
 async def cmd_users(message: Message):
@@ -91,19 +53,21 @@ async def cmd_users(message: Message):
         builder = InlineKeyboardBuilder()
         builder.button(text="🏠 Home", callback_data="home:menu")
         await message.answer(
-            "👥 <b>Users</b>\n\nNo users yet.\n\nAsk them to open the bot and tap Start.",
+            "👥 <b>Subscribers</b>\n\n"
+            "No users yet.\n"
+            "Ask them to open the bot and tap Start.",
             parse_mode="HTML",
             reply_markup=builder.as_markup(),
         )
         return
 
-    lines = [f"👥 <b>Users ({len(non_owner)})</b>", ""]
+    lines = ["👥 <b>Subscribers</b>", f"Total users: <b>{len(non_owner)}</b>", ""]
     pending = [u for u in non_owner if not getattr(u, "is_invited", False)]
     approved = [u for u in non_owner if getattr(u, "is_invited", False)]
     lines.append(f"Pending: <b>{len(pending)}</b>")
     lines.append(f"Invited: <b>{len(approved)}</b>")
     lines.append("")
-    lines.append("Tap Invite, Kick, or Delete below.")
+    lines.append("Use the buttons below to invite, kick, or delete a user.")
     for u in non_owner[:12]:
         lines.append(f"{'✅' if getattr(u, 'is_invited', False) else '⏳'} {_user_display(u)}  <i>{_user_status(u)}</i>")
 
@@ -143,7 +107,9 @@ async def cmd_approve(message: Message):
 
         if not db_user:
             await message.answer(
-                f"❌ User <code>{arg}</code> not found. They must start the bot first.",
+                "❌ <b>User Not Found</b>\n\n"
+                f"User: <code>{arg}</code>\n"
+                "They must open the bot and tap Start first.",
                 parse_mode="HTML",
             )
             return
@@ -152,12 +118,17 @@ async def cmd_approve(message: Message):
         try:
             invite_link = await _send_invite(message.bot, db_user.id)
             await message.answer(
-                f"✅ <b>Invite sent to {display}</b>\n\n"
-                f"Link (in case they need it manually):\n{invite_link}",
+                "✅ <b>Invite Sent</b>\n\n"
+                f"Subscriber: <b>{display}</b>\n"
+                f"Invite link:\n<code>{invite_link}</code>",
                 parse_mode="HTML",
             )
         except Exception as e:
-            await message.answer(f"❌ Failed: <code>{e}</code>", parse_mode="HTML")
+            await message.answer(
+                "❌ <b>Invite Failed</b>\n\n"
+                f"Reason: <code>{e}</code>",
+                parse_mode="HTML",
+            )
         return
 
     # /approve with no args — show picker
@@ -168,7 +139,13 @@ async def cmd_approve(message: Message):
     if not non_owner:
         builder = InlineKeyboardBuilder()
         builder.button(text="🏠 Home", callback_data="home:menu")
-        await message.answer("👥 <b>Users</b>\n\nNo users yet. Ask them to open the bot and tap Start.", parse_mode="HTML", reply_markup=builder.as_markup())
+        await message.answer(
+            "👥 <b>Subscribers</b>\n\n"
+            "No users yet.\n"
+            "Ask them to open the bot and tap Start.",
+            parse_mode="HTML",
+            reply_markup=builder.as_markup(),
+        )
         return
 
     builder = InlineKeyboardBuilder()
@@ -177,12 +154,13 @@ async def cmd_approve(message: Message):
         label = u.first_name or u.username or str(u.id)
         if u.username:
             label += f" (@{u.username})"
-        builder.button(text=f"✉️ {status} {label}", callback_data=f"approve_user:{u.id}")
+        builder.button(text=f"{status} {label}", callback_data=f"approve_user:{u.id}")
     builder.button(text="🏠 Home", callback_data="home:menu")
     builder.adjust(1)
 
     await message.answer(
-        f"👥 <b>Users ({len(non_owner)})</b>\n\nTap a user to send them the channel invite:",
+        "👥 <b>Subscribers</b>\n\n"
+        "Choose a user to send a private channel invite:",
         reply_markup=builder.as_markup(),
         parse_mode="HTML",
     )

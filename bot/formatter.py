@@ -157,7 +157,7 @@ def format_hold_message(display_name: str, signal: Signal, symbol: str = "") -> 
 # Watchlist
 def format_watchlist_message(results: list) -> str:
     if not results:
-        return "📋 <b>Watchlist</b>\n\nNo symbols yet. Use /add to start tracking."
+        return "📋 <b>Watchlist</b>\n\nNo symbols are tracked yet.\nUse /add to start scanning."
 
     lines = ["📋 <b>Watchlist</b>", ""]
     for r in results:

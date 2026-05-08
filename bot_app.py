@@ -55,20 +55,20 @@ async def main():
     ]
     owner_commands = [
         BotCommand(command="start", description="Dashboard"),
-        BotCommand(command="signal", description="Signal for symbol"),
-        BotCommand(command="scan", description="Scan now"),
-        BotCommand(command="chart", description="Chart"),
-        BotCommand(command="stats", description="Performance stats"),
+        BotCommand(command="signal", description="Check one symbol"),
+        BotCommand(command="scan", description="Scan channel watchlist"),
+        BotCommand(command="chart", description="Send 1H chart"),
+        BotCommand(command="stats", description="Performance summary"),
         BotCommand(command="history", description="Signal history"),
         BotCommand(command="watchlist", description="Watchlist"),
         BotCommand(command="add", description="Add symbol"),
         BotCommand(command="remove", description="Remove symbol"),
         BotCommand(command="symbols", description="Browse instruments"),
-        BotCommand(command="market", description="News"),
-        BotCommand(command="calendar", description="Calendar"),
+        BotCommand(command="market", description="Market news"),
+        BotCommand(command="calendar", description="Economic calendar"),
         BotCommand(command="hours", description="Market hours"),
-        BotCommand(command="users", description="Users"),
-        BotCommand(command="admin", description="Admin panel"),
+        BotCommand(command="users", description="Subscribers"),
+        BotCommand(command="approve", description="Invite subscriber"),
         BotCommand(command="help", description="Help"),
     ]
     await bot.set_my_commands(user_commands, scope=BotCommandScopeDefault())
@@ -88,7 +88,10 @@ async def main():
         await bot.send_message(
             cfg.OWNER_CHAT_ID,
             f"🤖 <b>CFD Signal Bot is Online</b>\n\n"
-            f"📲 Share with subscribers: <code>{share_link}</code>",
+            f"Status: <b>Running</b>\n"
+            f"Scanner: every <b>{cfg.SCAN_INTERVAL_MINUTES}</b> minutes\n"
+            f"Channel: <code>{cfg.BROADCAST_CHANNEL_ID}</code>\n\n"
+            f"Subscriber link: <code>{share_link}</code>",
             reply_markup=_menu_markup_main(),
         )
     except Exception as e:

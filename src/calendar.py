@@ -111,7 +111,12 @@ def format_calendar_message(events: list, today_only: bool = True) -> str:
     current_time = now_il.strftime("%H:%M")
 
     if not events:
-        return f"📅 <b>Economic Calendar</b>  ({period})\n\nNo high or medium impact events."
+        return (
+            f"📅 <b>Economic Calendar</b>\n"
+            f"Period: <b>{period}</b>\n"
+            f"Timezone: <b>Israel time ({tz})</b>\n\n"
+            "No high or medium impact events found."
+        )
 
     upcoming = [e for e in events if e["time_il"] >= current_time]
     past     = [e for e in events if e["time_il"] <  current_time]
