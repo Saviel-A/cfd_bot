@@ -102,16 +102,18 @@ Pressure: Buyers 62%
 Trade Plan
 Entry: 2,345.60
 Stop Loss: 2,337.60
-TP1: 2,357.60
-TP2: 2,361.60
-TP3: 2,369.60
+TP1: 2,357.60 partial
+TP2: 2,361.60 main
+TP3: 2,369.60 runner
+
+Risk
+Risk to SL: 8.00
+This is the price gap between Entry and Stop Loss.
+If SL is hit, close the trade.
 
 Setup
 4H trend: Bullish
 EMA: Bullish  MACD: Bullish  RSI: Bullish
-
-Stop distance: 8.00
-If price reaches SL, the setup is invalid.
 Manage risk. Not financial advice.
 ```
 
