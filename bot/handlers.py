@@ -97,28 +97,26 @@ def set_bot_username(username: str):
 def _commands_text(name: str) -> str:
     return (
         f"🤖 <b>CFD Signal Bot Owner Console</b>\n\n"
-        f"👋 Welcome back, <b>{name}</b>!\n\n"
-        "Automated multi-timeframe signals for Forex, Gold and Indices. "
-        "Alerts fire only when trend, indicators, pressure, news, and market hours pass.\n\n"
+        f"Welcome, <b>{name}</b>.\n\n"
         "🔔 <b>Signals</b>\n"
-        "/signal XAUUSD  Check one symbol\n"
-        "/scan  Scan watchlist and post valid alerts\n"
-        "/chart XAUUSD  Send chart preview\n\n"
+        "/signal XAUUSD - check one symbol\n"
+        "/scan - scan and post alerts\n"
+        "/chart XAUUSD - chart\n\n"
         "📈 <b>Performance</b>\n"
-        "/stats  Full performance summary\n"
-        "/history  Signal history and outcomes\n\n"
+        "/stats - performance\n"
+        "/history - history\n\n"
         "📋 <b>Watchlist</b>\n"
-        "/watchlist  View active symbols\n"
-        "/symbols  Browse instruments\n"
-        "/add XAUUSD  Add symbol\n"
-        "/remove XAUUSD  Remove symbol\n\n"
+        "/watchlist - active symbols\n"
+        "/symbols - browse\n"
+        "/add XAUUSD - add\n"
+        "/remove XAUUSD - remove\n\n"
         "📰 <b>Market Info</b>\n"
-        "/market  Latest news\n"
-        "/calendar  Economic calendar\n"
-        "/hours  Market hours in Israel time\n\n"
+        "/market - news\n"
+        "/calendar - calendar\n"
+        "/hours - market hours\n\n"
         "👥 <b>Subscribers</b>\n"
-        "/users  Manage subscribers\n"
-        "/approve  Invite subscriber"
+        "/users - manage\n"
+        "/approve - invite"
     )
 
 
@@ -262,12 +260,12 @@ async def cb_home(callback: CallbackQuery):
             builder.button(text="🏠 Home", callback_data="home:menu")
             builder.adjust(1)
             await callback.message.edit_text(
-                "📋 <b>Watchlist</b>\n\nNo symbols are tracked yet.\nAdd your first symbol to start scanning.",
+                "📋 <b>Watchlist</b>\n\nEmpty. Add a symbol to start.",
                 parse_mode="HTML", reply_markup=builder.as_markup(),
             )
             return
 
-        await callback.message.edit_text("🔍 <b>Scanning watchlist</b>\n\nChecking each symbol for a clean setup...", parse_mode="HTML")
+        await callback.message.edit_text("🔍 <b>Scanning watchlist...</b>", parse_mode="HTML")
         results = []
         for symbol in watchlist:
             try:
@@ -294,7 +292,7 @@ async def cb_home(callback: CallbackQuery):
         builder.button(text="🏠 Home",       callback_data="home:menu")
         builder.adjust(3)
         await callback.message.edit_text(
-            "🔔 <b>Check Signal</b>\n\n" + ("Choose a symbol from your watchlist:" if watchlist else "Your watchlist is empty. Add a symbol first."),
+            "🔔 <b>Check Signal</b>\n\n" + ("Choose a symbol:" if watchlist else "Your watchlist is empty. Add a symbol first."),
             parse_mode="HTML", reply_markup=builder.as_markup(),
         )
 
@@ -310,7 +308,7 @@ async def cb_home(callback: CallbackQuery):
         builder.button(text="🏠 Home", callback_data="home:menu")
         builder.adjust(3)
         await callback.message.edit_text(
-            "📰 <b>Market News</b>\n\n" + ("Choose a symbol to see recent headlines:" if watchlist else "Watchlist is empty. Add a symbol first."),
+            "📰 <b>Market News</b>\n\n" + ("Choose a symbol:" if watchlist else "Watchlist is empty. Add a symbol first."),
             parse_mode="HTML", reply_markup=builder.as_markup(),
         )
 
@@ -348,7 +346,7 @@ async def cb_home(callback: CallbackQuery):
         builder.button(text="🏠 Home",       callback_data="home:menu")
         builder.adjust(3)
         await callback.message.edit_text(
-            "📊 <b>Chart</b>\n\nChoose a symbol to generate a 1H chart:",
+            "📊 <b>Chart</b>\n\nChoose a symbol:",
             parse_mode="HTML", reply_markup=builder.as_markup(),
         )
 
@@ -508,7 +506,7 @@ async def cb_home(callback: CallbackQuery):
         from src.trading_hours import symbol_market_status
         market_open = _market_open_now()
         await callback.message.edit_text(
-            "📡 <b>Scanning Channel Watchlist</b>\n\nChecking for valid alerts to broadcast..." if market_open else "🔴 <b>Market Closed</b>\n\nSending market status updates instead of trade alerts...",
+            "📡 <b>Scanning channel...</b>" if market_open else "🔴 <b>Market closed</b>\nSending status only.",
             parse_mode="HTML",
         )
         async with AsyncSessionLocal() as session:
@@ -588,11 +586,11 @@ async def cmd_watchlist(message: Message):
         builder.button(text="🏠 Home", callback_data="home:menu")
         builder.adjust(1)
         await message.answer(
-            "📋 <b>Watchlist</b>\n\nNo symbols are tracked yet.\nAdd your first symbol to start scanning.",
+            "📋 <b>Watchlist</b>\n\nEmpty. Add a symbol to start.",
             parse_mode="HTML", reply_markup=builder.as_markup(),
         )
         return
-    await message.answer("🔍 <b>Scanning watchlist</b>\n\nChecking each symbol for a clean setup...", parse_mode="HTML")
+    await message.answer("🔍 <b>Scanning watchlist...</b>", parse_mode="HTML")
     results = []
     for symbol in watchlist:
         try:
@@ -879,13 +877,13 @@ async def cmd_signal(message: Message):
         builder.button(text="🏠 Home",       callback_data="home:menu")
         builder.adjust(3)
         await message.answer(
-            "🔔 <b>Check Signal</b>\n\n" + ("Choose a symbol from your watchlist:" if watchlist else "Watchlist is empty. Add a symbol first."),
+            "🔔 <b>Check Signal</b>\n\n" + ("Choose a symbol:" if watchlist else "Watchlist is empty. Add a symbol first."),
             parse_mode="HTML", reply_markup=builder.as_markup(),
         )
         return
     symbol = parts[1].upper()
     msg    = await message.answer(
-        f"🔍 <b>Scanning {symbol}</b>\n\nChecking trend, indicators, pressure, news, and market hours...",
+        f"🔍 <b>Scanning {symbol}...</b>",
         parse_mode="HTML",
     )
     try:
@@ -938,7 +936,7 @@ async def cb_scan_symbol(callback: CallbackQuery):
     symbol = callback.data.split(":")[1]
     await callback.answer()
     await callback.message.edit_text(
-        f"🔍 <b>Scanning {symbol}</b>\n\nChecking trend, indicators, pressure, news, and market hours...",
+        f"🔍 <b>Scanning {symbol}...</b>",
         parse_mode="HTML",
     )
     try:
@@ -997,7 +995,7 @@ async def cmd_market(message: Message):
     builder.button(text="🏠 Home", callback_data="home:menu")
     builder.adjust(3)
     text = (
-        "📰 <b>Market News</b>\n\nChoose a symbol to see recent headlines:"
+        "📰 <b>Market News</b>\n\nChoose a symbol:"
         if watchlist else
         "📰 <b>Market News</b>\n\nWatchlist is empty. Add a symbol first."
     )
@@ -1011,7 +1009,7 @@ async def cb_news_symbol(callback: CallbackQuery):
         return
     symbol = callback.data.split(":")[1]
     await callback.answer()
-    await callback.message.edit_text(f"📰 Fetching news for <b>{symbol}</b>...", parse_mode="HTML")
+    await callback.message.edit_text(f"📰 <b>Loading {symbol} news...</b>", parse_mode="HTML")
     try:
         loop = asyncio.get_running_loop()
         news = await loop.run_in_executor(None, lambda: get_news(symbol))
@@ -1041,7 +1039,7 @@ async def cb_calendar(callback: CallbackQuery):
     mode       = callback.data.split(":")[1]
     today_only = mode == "today"
     await callback.answer("Fetching...")
-    await callback.message.edit_text("📅 <b>Fetching calendar</b>\n\nLoading economic events...", parse_mode="HTML")
+    await callback.message.edit_text("📅 <b>Loading calendar...</b>", parse_mode="HTML")
     loop   = asyncio.get_running_loop()
     events = await loop.run_in_executor(None, lambda: get_calendar(today_only=today_only))
 
@@ -1210,12 +1208,12 @@ async def cmd_chart(message: Message):
         builder.button(text="🏠 Home",       callback_data="home:menu")
         builder.adjust(3)
         await message.answer(
-            "📊 <b>Chart</b>\n\nChoose a symbol to generate a 1H chart:",
+            "📊 <b>Chart</b>\n\nChoose a symbol:",
             parse_mode="HTML", reply_markup=builder.as_markup(),
         )
         return
     symbol = parts[1].upper()
-    msg = await message.answer(f"📊 <b>Generating Chart</b>\n\nSymbol: <b>{symbol}</b>\nTimeframe: <b>1H</b>", parse_mode="HTML")
+    msg = await message.answer(f"📊 <b>Generating {symbol} chart...</b>", parse_mode="HTML")
     try:
         loop  = asyncio.get_running_loop()
         buf   = await loop.run_in_executor(None, lambda: generate_chart(symbol))
@@ -1238,7 +1236,7 @@ async def cb_chart_symbol(callback: CallbackQuery):
         return
     symbol = callback.data.split(":")[1]
     await callback.answer()
-    await callback.message.edit_text(f"📊 <b>Generating Chart</b>\n\nSymbol: <b>{symbol}</b>\nTimeframe: <b>1H</b>", parse_mode="HTML")
+    await callback.message.edit_text(f"📊 <b>Generating {symbol} chart...</b>", parse_mode="HTML")
     try:
         loop  = asyncio.get_running_loop()
         buf   = await loop.run_in_executor(None, lambda: generate_chart(symbol))
@@ -1337,7 +1335,7 @@ async def cb_refresh_watchlist(callback: CallbackQuery):
         await callback.answer()
         return
     await callback.answer("Refreshing...")
-    await callback.message.edit_text("🔍 <b>Refreshing Watchlist</b>\n\nChecking each symbol again...", parse_mode="HTML")
+    await callback.message.edit_text("🔍 <b>Refreshing watchlist...</b>", parse_mode="HTML")
     async with AsyncSessionLocal() as session:
         watchlist = await get_watchlist(session, cfg.OWNER_CHAT_ID)
     results = []

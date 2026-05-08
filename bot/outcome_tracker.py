@@ -45,25 +45,35 @@ def _outcome_message(signal: Signal, outcome: str, price: float) -> str:
     dot   = "📈" if signal.direction == "BUY" else "📉"
     label = "BUY" if signal.direction == "BUY" else "SELL"
     entry = _fmt(float(signal.entry_price))
+    sl    = _fmt(float(signal.stop_loss))
     tp1   = _fmt(float(signal.tp1))
+    tp2   = _fmt(float(signal.tp2))
+    tp3   = _fmt(float(signal.tp3))
     now   = _fmt(price)
 
-    advice = {
-        "TP1":     f"🎯 <b>TP1 Reached</b>\n\nAction: consider securing partial profit.\nRisk: move Stop Loss to entry (<code>{entry}</code>) if still holding.",
-        "TP2":     f"🎯 <b>TP2 Reached</b>\n\nAction: consider closing another part of the position.\nRisk: move Stop Loss to TP1 (<code>{tp1}</code>).",
-        "TP3":     f"🏆 <b>TP3 Reached</b>\n\nAction: full target reached. Consider closing the trade.",
-        "SL":      f"❌ <b>Stop Loss Hit</b>\n\nAction: close the trade if still open.\nReason: setup is invalidated.",
-        "EXPIRED": f"⏸ <b>Signal Expired</b>\n\nAction: close if still open.\nReason: no target was reached within 48 hours.",
+    title = {
+        "TP1": "🎯 TP1 hit",
+        "TP2": "🎯 TP2 hit",
+        "TP3": "🏆 TP3 hit",
+        "SL": "❌ Stop Loss hit",
+        "EXPIRED": "⏸ Signal expired",
     }.get(outcome, outcome)
 
+    action = {
+        "TP1": f"Secure partial profit. Consider moving SL to entry {entry}.",
+        "TP2": f"Consider locking more profit. Next target: {tp3}.",
+        "TP3": "Final target reached.",
+        "SL": "Trade is closed. Do not hold after SL.",
+        "EXPIRED": "Close if still open.",
+    }.get(outcome, "")
+
     return (
-        f"{dot} <b>{signal.symbol} {label}</b>\n"
-        f"\n"
-        f"📣 <b>Trade Update</b>\n"
-        f"{advice}\n"
-        f"\n"
+        f"{dot} <b>{signal.symbol} {label}</b>\n\n"
+        f"<b>{title}</b>\n"
         f"Entry: <code>{entry}</code>\n"
-        f"Current: <code>{now}</code>"
+        f"Now: <code>{now}</code>\n"
+        f"SL: <code>{sl}</code> | TP: <code>{tp1}</code> / <code>{tp2}</code> / <code>{tp3}</code>\n\n"
+        f"{action}"
     )
 
 

@@ -199,16 +199,15 @@ async def run_scan_loop(bot, interval_minutes: int = 60):
                 if _prev_market_open is False and market_open:
                     await bot.send_message(
                         cfg.BROADCAST_CHANNEL_ID,
-                        f"🟢 <b>Market Open</b>\n\n"
-                        f"Trading session is active again.\n"
+                        f"🟢 <b>Market Open</b>\n"
                         f"Israel time: <b>{time_str}</b>",
                         parse_mode="HTML",
                     )
                 elif _prev_market_open is True and not market_open:
                     await bot.send_message(
                         cfg.BROADCAST_CHANNEL_ID,
-                        f"🔴 <b>Market Closed</b>\n\n"
-                        f"No new Forex, Gold, or Energy alerts will be sent while the market is closed.\n"
+                        f"🔴 <b>Market Closed</b>\n"
+                        f"No new Forex/Gold/Energy alerts.\n"
                         f"Israel time: <b>{time_str}</b>",
                         parse_mode="HTML",
                     )

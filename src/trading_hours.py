@@ -112,24 +112,23 @@ def get_hours_message() -> str:
 
     markets = [
         ("forex",  "💱",  "Metals, Forex and Energy",
-            "Monday 00:00 to Friday 23:00\n"
-            "Daily break: 23:00 to 00:00\n"
-            "Weekend: closed until Sunday 23:00"),
+            "Mon-Fri, daily break 23:00-00:00"),
         ("crypto", "₿",   "Crypto",
             "24/7, no break"),
         ("us",     "🇺🇸", "US Indices and Stocks",
-            f"Monday to Friday, {_to_il(13,30)} to {_to_il(20,0)}"),
+            f"Mon-Fri, {_to_il(13,30)}-{_to_il(20,0)}"),
         ("eu",     "🇪🇺", "European Indices",
-            f"Monday to Friday, {_to_il(7,0)} to {_to_il(15,30)}"),
+            f"Mon-Fri, {_to_il(7,0)}-{_to_il(15,30)}"),
         ("asia",   "🌏",  "Asian Indices",
-            f"Monday to Friday, {_to_il(0,0)} to {_to_il(6,0)}"),
+            f"Mon-Fri, {_to_il(0,0)}-{_to_il(6,0)}"),
     ]
 
-    lines = [f"🕐 <b>Market Hours</b>", f"Timezone: <b>Israel time ({tz})</b>", ""]
+    lines = ["🕐 <b>Market Hours</b>", f"Israel time ({tz})", ""]
 
     for key, icon, name, hours in markets:
         dot = "🟢" if _is_open(key, now_utc) else "🔴"
-        lines.append(f"{dot} {icon} <b>{name}</b>\n{hours}\n")
+        lines.append(f"{dot} {icon} <b>{name}</b>: {hours}")
 
-    lines.append(now_il.strftime("Updated: %A, %d %B at %H:%M Israel time"))
+    lines.append("")
+    lines.append(now_il.strftime("Updated: %H:%M"))
     return "\n".join(lines)

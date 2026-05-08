@@ -23,7 +23,7 @@ class Config:
     # Strategy (hardcoded)
     DEFAULT_TIMEFRAME: str   = "1h"
     HTF_TIMEFRAME: str       = "4h"
-    MIN_CONFLUENCE: int      = 2     # indicators must agree out of 4
+    MIN_CONFLUENCE: int      = 3     # indicators must agree out of 4
     SL_ATR_MULTIPLIER: float = float(os.getenv("SL_ATR_MULTIPLIER", "0.5"))
     SL_MIN: float            = float(os.getenv("SL_MIN", "7.0"))
     SL_MAX: float            = float(os.getenv("SL_MAX", "10.0"))

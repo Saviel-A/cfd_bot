@@ -93,27 +93,14 @@ Subscribers see a subscribe screen when they open the bot. They pay via Telegram
 ```
 📈 XAUUSD: Gold BUY
 
-🟢 Status: Active
-⏱ Timeframe: 1H entry + 4H trend
-📰 News: Clear
-⚖️ Pressure: Buyers 62%
+Entry: 2,345.60
+SL: 2,337.60  (risk 8.00)
+TP: 2,357.60 / 2,361.60 / 2,369.60
 
-📌 Trade Plan
-💰 Entry: 2,345.60
-🛑 Stop Loss: 2,337.60
-🎯 TP1: 2,357.60 partial
-🎯 TP2: 2,361.60 main
-🎯 TP3: 2,369.60 runner
+Why: 4H bullish + 1H confirms
+Check: News clear | Buyers 62%
 
-⚠️ Risk
-Risk to SL: 8.00
-This is the price gap between Entry and Stop Loss.
-If SL is hit, close the trade.
-
-🧠 Setup
-4H trend: Bullish
-EMA: Bullish  MACD: Bullish  RSI: Bullish
-Manage risk. Not financial advice.
+If SL hits, exit. Not financial advice.
 ```
 
 ## Strategy
@@ -125,7 +112,7 @@ All strategy parameters are hardcoded — no user configuration needed:
 | Entry timeframe | 1H |
 | Trend filter | 4H EMA 20/50 |
 | Indicators | EMA cross, RSI, MACD, Bollinger Bands |
-| Min confluence | 2 of 4 indicators |
+| Min confluence | 3 of 4 indicators |
 | Counter-trend signals | Blocked |
 | RSI exhaustion filter | Blocks BUY above 70 and SELL below 30 |
 | Market pressure filter | Blocks alerts when recent candles do not confirm direction |

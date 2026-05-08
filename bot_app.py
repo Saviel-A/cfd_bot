@@ -87,11 +87,10 @@ async def main():
         name = "Owner"
         await bot.send_message(
             cfg.OWNER_CHAT_ID,
-            f"🤖 <b>CFD Signal Bot is Online</b>\n\n"
-            f"Status: <b>Running</b>\n"
-            f"Scanner: every <b>{cfg.SCAN_INTERVAL_MINUTES}</b> minutes\n"
-            f"Channel: <code>{cfg.BROADCAST_CHANNEL_ID}</code>\n\n"
-            f"Subscriber link: <code>{share_link}</code>",
+            f"🤖 <b>CFD Bot Online</b>\n\n"
+            f"Scan: every <b>{cfg.SCAN_INTERVAL_MINUTES}m</b>\n"
+            f"Channel: <code>{cfg.BROADCAST_CHANNEL_ID}</code>\n"
+            f"Link: <code>{share_link}</code>",
             reply_markup=_menu_markup_main(),
         )
     except Exception as e:

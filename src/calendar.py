@@ -113,9 +113,8 @@ def format_calendar_message(events: list, today_only: bool = True) -> str:
     if not events:
         return (
             f"📅 <b>Economic Calendar</b>\n"
-            f"Period: <b>{period}</b>\n"
-            f"Timezone: <b>Israel time ({tz})</b>\n\n"
-            "No high or medium impact events found."
+            f"{period} | Israel time ({tz})\n\n"
+            "No high/medium impact events."
         )
 
     upcoming = [e for e in events if e["time_il"] >= current_time]
@@ -131,7 +130,7 @@ def format_calendar_message(events: list, today_only: bool = True) -> str:
             f"{ev['title']}{forecast}{prev}"
         )
 
-    lines = [f"📅 <b>Economic Calendar</b>", f"Period: <b>{period}</b>", f"Timezone: <b>Israel time ({tz})</b>", ""]
+    lines = ["📅 <b>Economic Calendar</b>", f"{period} | Israel time ({tz})", ""]
 
     if upcoming:
         lines.append("<b>Upcoming</b>")
