@@ -4,7 +4,7 @@ Signal Engine — multi-timeframe confluence gate.
 Flow:
   1. 4H bias (EMA 50/200) → bullish / bearish / neutral
   2. 1H indicators vote (+1 / -1 / 0)
-  3. Counter-trend signals discarded
+  3. Counter-trend signals blocked unless all 1H indicators override
   4. Must reach min_confluence threshold
 """
 
@@ -23,17 +23,18 @@ class Signal:
     candle_time: Optional[str] = None
     current_price: Optional[float] = None
     reason: str = ""
+    is_counter_trend: bool = False
 
 
 def _htf_bias(df_htf: pd.DataFrame) -> str:
-    """Determine 4H trend via EMA 20/50."""
-    if df_htf is None or len(df_htf) < 50:
+    """Determine 4H trend via EMA 50/200 (institutional golden/death cross)."""
+    if df_htf is None or len(df_htf) < 200:
         return "NEUTRAL"
-    ema20 = df_htf["close"].ewm(span=20, adjust=False).mean().iloc[-1]
-    ema50 = df_htf["close"].ewm(span=50, adjust=False).mean().iloc[-1]
-    if ema20 > ema50:
+    ema50  = df_htf["close"].ewm(span=50,  adjust=False).mean().iloc[-1]
+    ema200 = df_htf["close"].ewm(span=200, adjust=False).mean().iloc[-1]
+    if ema50 > ema200:
         return "BULLISH"
-    elif ema20 < ema50:
+    elif ema50 < ema200:
         return "BEARISH"
     return "NEUTRAL"
 
@@ -82,6 +83,7 @@ def generate_signal(
     bear_count = sum(1 for v in votes.values() if v == -1)
 
     reason = ""
+    is_counter_trend = False
 
     if htf_bias == "NEUTRAL":
         raw_dir = "HOLD"
@@ -101,6 +103,24 @@ def generate_signal(
         if rsi < 30:
             raw_dir = "HOLD"
             reason = "SELL blocked: RSI is oversold"
+    elif htf_bias == "BULLISH" and bear_count == len(votes):
+        raw_dir = "SELL"
+        strength = bear_count
+        reason = "4H bullish + full 1H bearish override"
+        is_counter_trend = True
+        if rsi < 30:
+            raw_dir = "HOLD"
+            reason = "SELL blocked: RSI is oversold"
+            is_counter_trend = False
+    elif htf_bias == "BEARISH" and bull_count == len(votes):
+        raw_dir = "BUY"
+        strength = bull_count
+        reason = "4H bearish + full 1H bullish override"
+        is_counter_trend = True
+        if rsi > 70:
+            raw_dir = "HOLD"
+            reason = "BUY blocked: RSI is overbought"
+            is_counter_trend = False
     else:
         raw_dir = "HOLD"
         strength = max(bull_count, bear_count)
@@ -120,6 +140,7 @@ def generate_signal(
         candle_time=candle_time,
         current_price=price,
         reason=reason,
+        is_counter_trend=is_counter_trend,
     )
 
 

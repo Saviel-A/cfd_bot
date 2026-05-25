@@ -25,8 +25,8 @@ class Config:
     HTF_TIMEFRAME: str       = "4h"
     MIN_CONFLUENCE: int      = 3     # indicators must agree out of 4
     SL_ATR_MULTIPLIER: float = float(os.getenv("SL_ATR_MULTIPLIER", "0.5"))
-    SL_MIN: float            = float(os.getenv("SL_MIN", "7.0"))
-    SL_MAX: float            = float(os.getenv("SL_MAX", "10.0"))
+    SL_MIN: float            = 7.0   # pips
+    SL_MAX: float            = 10.0  # pips
     RR1: float               = float(os.getenv("RR1", "1.5"))
     RR2: float               = float(os.getenv("RR2", "2.0"))
     RR3: float               = float(os.getenv("RR3", "3.0"))
@@ -53,4 +53,12 @@ RISK_CFG = {
     "rr1":               cfg.RR1,
     "rr2":               cfg.RR2,
     "rr3":               cfg.RR3,
+}
+
+# Counter-trend signals: tighter TP, same risk — quick in, quick out
+COUNTER_TREND_RISK_CFG = {
+    **RISK_CFG,
+    "rr1": 1.0,
+    "rr2": 1.5,
+    "rr3": 2.0,
 }

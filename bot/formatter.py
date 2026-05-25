@@ -1,30 +1,33 @@
 """Telegram message formatter."""
 
 from src.signal_engine import Signal
-from src.risk_manager import TradeParams
+from src.risk_manager import TradeParams, get_pip_size
 from src.trading_hours import symbol_market_status
 from src.instruments import get_symbol_label
 from typing import Optional
 
 
 def _fmt_alert(price: float) -> str:
-    """Format signal levels with enough precision for execution."""
     if price < 10:
         return f"{price:.5f}".rstrip("0").rstrip(".")
-    return f"{price:,.2f}"
+    return f"{int(round(price)):,}"
 
 
 def _fmt_price(price: float) -> str:
-    """For live price display: always show 2 decimal places."""
     if price < 10:
         return f"{price:.5f}".rstrip("0").rstrip(".")
-    return f"{price:,.2f}"
+    return f"{int(round(price)):,}"
 
 
 def _fmt_distance(value: float) -> str:
     if value < 1:
         return f"{value:.5f}".rstrip("0").rstrip(".")
-    return f"{value:,.2f}"
+    return f"{int(round(value))}"
+
+
+def _to_pips(distance: float, symbol: str) -> int:
+    pip = get_pip_size(symbol)
+    return int(round(distance / pip))
 
 
 def _vote_label(value: int) -> str:
@@ -46,6 +49,8 @@ def _format_reason(reason: str) -> str:
         "SELL blocked: RSI is oversold": "Sell blocked: RSI is oversold",
         "4H bullish trend + 1H bullish confirmation": "4H bullish + 1H confirms",
         "4H bearish trend + 1H bearish confirmation": "4H bearish + 1H confirms",
+        "4H bullish + full 1H bearish override": "Strong reversal — all indicators bearish",
+        "4H bearish + full 1H bullish override": "Strong reversal — all indicators bullish",
         "Not enough aligned confirmation": "Not enough confirmation",
         "4H trend is neutral": "4H trend is neutral",
     }
@@ -93,20 +98,22 @@ def format_signal_message(
     tp1   = f"<code>{_fmt_alert(trade.tp1)}</code>"       if trade else "N/A"
     tp2   = f"<code>{_fmt_alert(trade.tp2)}</code>"       if trade else "N/A"
     tp3   = f"<code>{_fmt_alert(trade.tp3)}</code>"       if trade else "N/A"
-    risk  = f"<code>{_fmt_distance(trade.sl_distance)}</code>" if trade else "N/A"
+    pips  = f"{_to_pips(trade.sl_distance, symbol)} pips" if trade else "N/A"
 
     news = _news_line(news_risk, news_events)
     pressure = _pressure_line(market_pressure)
     reason = _format_reason(signal.reason)
 
     return (
-        f"{arrow} <b>{name} {label}</b>\n\n"
+        f"{arrow} <b>{name} {label}</b>\n"
+        f"Setup: {reason}\n\n"
         f"Entry: {entry}\n"
-        f"SL: {sl}  (risk {risk})\n"
-        f"TP: {tp1} / {tp2} / {tp3}\n\n"
-        f"Why: {reason}\n"
-        f"Check: {news} | {pressure}\n\n"
-        f"<i>If SL hits, exit. Not financial advice.</i>"
+        f"SL: {sl}  🛑 {pips}\n"
+        f"TP1: {tp1}\n"
+        f"TP2: {tp2}\n"
+        f"TP3: {tp3}\n\n"
+        f"{news} | {pressure}\n"
+        f"<i>Risk is capped at 7-10 pips. Exit at SL.</i>"
     )
 
 
@@ -174,13 +181,13 @@ def format_watchlist_message(results: list) -> str:
 
 def format_stats_message(stats: dict) -> str:
     if not stats["total"]:
-        return "📊 <b>Stats</b>\n\nNo signals yet. Run the bot, collect outcomes, then use /stats."
+        return "📊 <b>Stats</b>\n\nNo signals yet. Run the bot, collect outcomes, then check back."
 
     closed = stats["closed"]
     win_rate = (stats["wins"] / closed * 100) if closed else 0
 
     lines = [
-        "📊 <b>Performance</b>",
+        "📊 <b>Stats</b>",
         f"Signals: <b>{stats['total']}</b> | Open: <b>{stats['open']}</b>",
         f"Closed: <b>{closed}</b> | Win rate: <b>{win_rate:.1f}%</b>",
         f"Wins: <b>{stats['wins']}</b> | Losses: <b>{stats['losses']}</b> | Expired: <b>{stats['expired']}</b>",
@@ -212,13 +219,13 @@ def format_history_message(signals: list, limit: int = 20) -> str:
         return "📋 <b>Signal History</b>\n\nNo signals fired yet."
 
     outcome_label = {
-        "OPEN":    "⏳ Still open",
-        "TP1":     "🎯 TP1 reached",
-        "TP2":     "🎯 TP2 reached",
-        "TP3":     "🏆 TP3 reached",
-        "SL":      "❌ Stop Loss hit",
-        "EXPIRED": "⏸ Expired",
-        "SUPERSEDED": "🔁 Replaced by newer signal",
+        "OPEN":      "⏳ Open",
+        "TP1":       "🎯 TP1 hit",
+        "TP2":       "🎯🎯 TP2 hit",
+        "TP3":       "🏆 TP3 hit",
+        "SL":        "🛑 SL hit",
+        "EXPIRED":   "⏸ Expired",
+        "SUPERSEDED": "🔁 Replaced",
     }
 
     lines = [f"📋 <b>Signal History</b>", f"Showing: <b>{len(signals)}</b>"]

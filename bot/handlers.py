@@ -66,8 +66,8 @@ def _menu_markup_main():
     builder = InlineKeyboardBuilder()
     builder.button(text="🔔 Check Signal", callback_data="home:signal")
     builder.button(text="📡 Scan Channel", callback_data="home:scan")
-    builder.button(text="📊 Chart",        callback_data="home:chart")
-    builder.button(text="📈 Performance",  callback_data="home:stats")
+    builder.button(text="📉 Chart",         callback_data="home:chart")
+    builder.button(text="📊 Stats",         callback_data="home:stats")
     builder.button(text="📜 History",      callback_data="home:history")
     builder.button(text="📋 Watchlist",    callback_data="home:watchlist")
     builder.button(text="🔎 Instruments",  callback_data="home:symbols")
@@ -104,9 +104,9 @@ def _commands_text(name: str) -> str:
         "/signal XAUUSD - Check Signal\n"
         "/scan - Scan Channel\n"
         "/chart XAUUSD - Chart\n\n"
-        "📈 <b>Performance</b>\n"
-        "/stats - Performance\n"
-        "/history - History\n\n"
+        "📊 <b>Stats</b>\n"
+        "/stats - Signal stats\n"
+        "/history - Signal history\n\n"
         "📋 <b>Watchlist</b>\n"
         "/watchlist - Watchlist\n"
         "/symbols - Instruments\n"
@@ -140,7 +140,7 @@ async def _scan_symbol(symbol: str) -> dict:
     atr   = float(df.iloc[-1].get("atr", 0) or 0)
     trade = None
     if signal.direction in ("BUY", "SELL"):
-        trade = calculate_trade(signal.direction, signal.current_price, atr, RISK_CFG)
+        trade = calculate_trade(signal.direction, signal.current_price, atr, RISK_CFG, symbol=symbol)
         if trade is None:
             signal.reason = f"{signal.direction} blocked: risk levels unavailable"
             signal.direction = "HOLD"
@@ -545,7 +545,7 @@ async def cb_home(callback: CallbackQuery):
                 except Exception:
                     pass
                 if live_price and atr > 0:
-                    trade = calculate_trade(signal.direction, live_price, atr, RISK_CFG)
+                    trade = calculate_trade(signal.direction, live_price, atr, RISK_CFG, symbol=symbol)
 
                 result["live_price"] = live_price
                 result["trade"] = trade
@@ -905,7 +905,7 @@ async def cmd_signal(message: Message):
                 pass
             trade = r["trade"]
             if live_price and r["atr"] > 0:
-                trade = calculate_trade(r["signal"].direction, live_price, r["atr"], RISK_CFG)
+                trade = calculate_trade(r["signal"].direction, live_price, r["atr"], RISK_CFG, symbol=symbol)
             text = format_signal_message(
                 r["display_name"], r["signal"], trade,
                 symbol=r["symbol"], live_price=live_price,
@@ -958,7 +958,7 @@ async def cb_scan_symbol(callback: CallbackQuery):
                 pass
             trade = r["trade"]
             if live_price and r["atr"] > 0:
-                trade = calculate_trade(r["signal"].direction, live_price, r["atr"], RISK_CFG)
+                trade = calculate_trade(r["signal"].direction, live_price, r["atr"], RISK_CFG, symbol=symbol)
             text = format_signal_message(
                 r["display_name"], r["signal"], trade,
                 symbol=r["symbol"], live_price=live_price,
@@ -1165,7 +1165,7 @@ async def cmd_scan(message: Message):
             except Exception:
                 pass
             if live_price and atr > 0:
-                trade = calculate_trade(signal.direction, live_price, atr, RISK_CFG)
+                trade = calculate_trade(signal.direction, live_price, atr, RISK_CFG, symbol=symbol)
 
             result["live_price"] = live_price
             result["trade"] = trade

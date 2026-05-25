@@ -51,28 +51,30 @@ def _outcome_message(signal: Signal, outcome: str, price: float) -> str:
     tp3   = _fmt(float(signal.tp3))
     now   = _fmt(price)
 
-    title = {
-        "TP1": "🎯 TP1 hit",
-        "TP2": "🎯 TP2 hit",
-        "TP3": "🏆 TP3 hit",
-        "SL": "❌ Stop Loss hit",
-        "EXPIRED": "⏸ Signal expired",
-    }.get(outcome, outcome)
-
-    action = {
-        "TP1": f"Secure partial profit. Consider moving SL to entry {entry}.",
-        "TP2": f"Consider locking more profit. Next target: {tp3}.",
-        "TP3": "Final target reached.",
-        "SL": "Trade is closed. Do not hold after SL.",
-        "EXPIRED": "Close if still open.",
-    }.get(outcome, "")
+    if outcome == "TP1":
+        header = "🎯 <b>TP1 Hit</b>"
+        action = f"Lock partial profit. Move SL to entry <code>{entry}</code>. Next target: <code>{tp2}</code>"
+    elif outcome == "TP2":
+        header = "🎯 <b>TP2 Hit</b>"
+        action = f"Lock more profit. Move SL to TP1. Next target: <code>{tp3}</code>"
+    elif outcome == "TP3":
+        header = "🏆 <b>TP3 Hit — Full Run!</b>"
+        action = "Close the trade. Full target reached."
+    elif outcome == "SL":
+        header = "🛑 <b>Stop Loss Hit</b>"
+        action = "Trade closed. Wait for the next signal."
+    else:
+        header = "⏸ <b>Signal Expired</b>"
+        action = "Close if still open."
 
     return (
         f"{dot} <b>{signal.symbol} {label}</b>\n\n"
-        f"<b>{title}</b>\n"
+        f"{header}\n\n"
         f"Entry: <code>{entry}</code>\n"
-        f"Now: <code>{now}</code>\n"
-        f"SL: <code>{sl}</code> | TP: <code>{tp1}</code> / <code>{tp2}</code> / <code>{tp3}</code>\n\n"
+        f"🛑 SL: <code>{sl}</code>\n"
+        f"🎯 TP1: <code>{tp1}</code>\n"
+        f"🎯 TP2: <code>{tp2}</code>\n"
+        f"🏆 TP3: <code>{tp3}</code>\n\n"
         f"{action}"
     )
 
