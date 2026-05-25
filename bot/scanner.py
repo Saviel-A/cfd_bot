@@ -243,7 +243,12 @@ async def run_scan_loop(bot, interval_minutes: int = 60):
                                 continue
 
                             result = await scan_symbol(symbol)
-                            if not result or result["signal"].direction not in ("BUY", "SELL"):
+                            if not result:
+                                logger.info(f"{symbol}: scan failed")
+                                continue
+                            if result["signal"].direction not in ("BUY", "SELL"):
+                                reason = result["signal"].reason or "No clean setup"
+                                logger.info(f"{symbol}: no signal - {reason}")
                                 continue
 
                             signal = result["signal"]
