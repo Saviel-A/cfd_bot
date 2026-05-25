@@ -67,12 +67,33 @@ async def get_signal_stats(session: AsyncSession, limit: int = 100) -> dict:
 
     by_symbol: dict[str, dict] = {}
     for s in closed:
-        bucket = by_symbol.setdefault(s.symbol, {"symbol": s.symbol, "wins": 0, "losses": 0, "total": 0})
+        bucket = by_symbol.setdefault(
+            s.symbol,
+            {
+                "symbol": s.symbol,
+                "wins": 0,
+                "losses": 0,
+                "expired": 0,
+                "tp1": 0,
+                "tp2": 0,
+                "tp3": 0,
+                "total": 0,
+            },
+        )
         bucket["total"] += 1
-        if s.outcome in ("TP1", "TP2", "TP3"):
+        if s.outcome == "TP1":
             bucket["wins"] += 1
+            bucket["tp1"] += 1
+        elif s.outcome == "TP2":
+            bucket["wins"] += 1
+            bucket["tp2"] += 1
+        elif s.outcome == "TP3":
+            bucket["wins"] += 1
+            bucket["tp3"] += 1
         elif s.outcome == "SL":
             bucket["losses"] += 1
+        elif s.outcome == "EXPIRED":
+            bucket["expired"] += 1
 
     ranked = sorted(
         by_symbol.values(),
@@ -91,6 +112,7 @@ async def get_signal_stats(session: AsyncSession, limit: int = 100) -> dict:
         "tp1": sum(1 for s in closed if s.outcome == "TP1"),
         "tp2": sum(1 for s in closed if s.outcome == "TP2"),
         "tp3": sum(1 for s in closed if s.outcome == "TP3"),
+        "recent_closed": closed[:8],
         "best_symbols": ranked[:3],
         "worst_symbols": list(reversed(ranked[-3:])) if ranked else [],
     }

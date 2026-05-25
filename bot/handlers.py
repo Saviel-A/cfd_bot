@@ -105,8 +105,8 @@ def _commands_text(name: str) -> str:
         "/scan - Scan Channel\n"
         "/chart XAUUSD - Chart\n\n"
         "📊 <b>Stats</b>\n"
-        "/stats - Signal stats\n"
-        "/history - Signal history\n\n"
+        "/stats - Stats\n"
+        "/history - History\n\n"
         "📋 <b>Watchlist</b>\n"
         "/watchlist - Watchlist\n"
         "/symbols - Instruments\n"
@@ -208,15 +208,14 @@ async def cmd_start(message: Message):
     builder = InlineKeyboardBuilder()
     builder.button(text="⭐ Subscribe Now", callback_data="sub:plans")
     await message.answer(
-        f"👋 <b>Welcome, {name}!</b>\n\n"
-        "📡 <b>CFD Smart Signals</b>\n\n"
-        "Professional trading signals for Forex, Gold and Indices.\n\n"
-        "✅  Multi-timeframe analysis (1H + 4H)\n"
-        "✅  Entry price, Stop Loss and 3 Take Profit levels\n"
-        "✅  ATR-based risk management on every signal\n"
-        "✅  Economic calendar and market session alerts\n"
-        "✅  Signals delivered to a private VIP channel\n\n"
-        "<b>Subscribe below to get instant access.</b>",
+        f"👋 <b>Welcome, {name}</b>\n\n"
+        "📡 <b>CFD Smart Signals</b>\n"
+        "Private alerts for Forex, Gold and Indices.\n\n"
+        "Each alert includes:\n"
+        "Entry | SL | TP1 | TP2 | TP3\n"
+        "7-10 pip SL cap\n"
+        "1H setup + 4H trend check\n\n"
+        "Subscribe to get channel access.",
         parse_mode="HTML",
         reply_markup=builder.as_markup(),
     )
@@ -1365,12 +1364,12 @@ async def cb_sub_plans(callback: CallbackQuery):
     builder.adjust(1)
     await callback.message.edit_text(
         "⭐️ <b>CFD Smart Signals</b>\n\n"
-        "Professional CFD trading signals delivered to a private channel.\n\n"
-        "💎 <b>1 Month</b>  $99\n"
-        "💎 <b>3 Months</b>  $199  <i>(save $98)</i>\n"
-        "💎 <b>Lifetime</b>  $299  <i>(best value)</i>\n\n"
-        "Tap a plan below to pay with Telegram Stars.\n"
-        "Access is granted instantly after payment.",
+        "Private CFD signal channel.\n"
+        "Signals include Entry, SL, TP1, TP2 and TP3.\n\n"
+        "1 Month: <b>$99</b>\n"
+        "3 Months: <b>$199</b>\n"
+        "Lifetime: <b>$299</b>\n\n"
+        "Pay with Telegram Stars. Access is instant.",
         parse_mode="HTML",
         reply_markup=builder.as_markup(),
     )
@@ -1446,14 +1445,14 @@ async def handle_successful_payment(message: Message):
             logger.warning(f"Could not create invite link: {e}")
 
     text = (
-        f"✅ <b>Payment received!</b>\n\n"
+        f"✅ <b>Payment Received</b>\n\n"
         f"Plan: <b>{plan['label']}</b>\n"
         f"Valid until: <b>{expiry_str}</b>\n\n"
     )
     if invite_link:
-        text += f"👇 <b>Join the private signals channel:</b>\n{invite_link}\n\n<i>Single-use link. Tap it once to join.</i>"
+        text += f"Join the private channel:\n{invite_link}\n\n<i>Single-use link.</i>"
     else:
-        text += "You will start receiving signals shortly."
+        text += "Access is active. Channel invite will be sent shortly."
 
     await message.answer(text, parse_mode="HTML")
 
@@ -1523,12 +1522,9 @@ async def handle_join_request(request: ChatJoinRequest):
         try:
             await request.bot.send_message(
                 user_id,
-                f"👋 <b>Hi {name}!</b>\n\n"
-                "To join the <b>CFD Smart Signals</b> channel you need an active subscription.\n\n"
-                "✅  Multi-timeframe analysis (1H + 4H)\n"
-                "✅  Entry, Stop Loss and 3 Take Profit levels\n"
-                "✅  Signals delivered to a private VIP channel\n\n"
-                "<b>Subscribe below to get instant access.</b>",
+                f"👋 <b>Hi {name}</b>\n\n"
+                "This is a private signals channel.\n\n"
+                "Subscribe to get access to alerts with Entry, SL, TP1, TP2 and TP3.",
                 parse_mode="HTML",
                 reply_markup=builder.as_markup(),
             )
@@ -1556,15 +1552,11 @@ async def catch_all_user(message: Message):
     builder = InlineKeyboardBuilder()
     builder.button(text="⭐ Subscribe Now", callback_data="sub:plans")
     await message.answer(
-        f"👋 <b>Welcome, {name}!</b>\n\n"
-        "📡 <b>CFD Smart Signals</b>\n\n"
-        "Professional trading signals for Forex, Gold and Indices.\n\n"
-        "✅  Multi-timeframe analysis (1H + 4H)\n"
-        "✅  Entry price, Stop Loss and 3 Take Profit levels\n"
-        "✅  ATR-based risk management on every signal\n"
-        "✅  Economic calendar and market session alerts\n"
-        "✅  Signals delivered to a private VIP channel\n\n"
-        "<b>Subscribe below to get instant access.</b>",
+        f"👋 <b>Welcome, {name}</b>\n\n"
+        "📡 <b>CFD Smart Signals</b>\n"
+        "Private alerts for Forex, Gold and Indices.\n\n"
+        "Each alert includes Entry, SL, TP1, TP2 and TP3.\n"
+        "Subscribe to get channel access.",
         parse_mode="HTML",
         reply_markup=builder.as_markup(),
     )

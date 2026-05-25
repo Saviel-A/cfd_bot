@@ -5,14 +5,14 @@ A professional Telegram signal bot for Forex, Gold, Indices and Crypto. Scans th
 ## How It Works
 
 1. The bot scans the owner's watchlist every 60 minutes (configurable)
-2. Each symbol is analysed on two timeframes — 4H for trend bias, 1H for entry
+2. Each symbol is analysed on two timeframes: 4H for trend bias, 1H for entry
 3. Four indicators vote: EMA cross, RSI, MACD, Bollinger Bands
-4. If 2 or more agree AND align with the 4H trend — a signal fires
+4. If 3 or more agree and align with the 4H trend, a signal can fire
 5. Recent candle pressure must confirm the trade direction
-6. Stop Loss and 3 Take Profit levels are calculated using ATR
+6. Stop Loss is clamped to 7-10 pips and 3 Take Profit levels are calculated
 7. The signal is broadcast to the private channel instantly
 
-Signals only fire on **closed candles** — never on a forming candle.
+Signals only fire on **closed candles**, never on a forming candle.
 
 ## Requirements
 
@@ -73,7 +73,7 @@ The bot sends a startup message to the owner on launch.
 | `/signal XAUUSD` | Check Signal |
 | `/scan` | Scan Channel |
 | `/chart XAUUSD` | Chart |
-| `/stats` | Performance |
+| `/stats` | Stats |
 | `/history` | History |
 | `/watchlist` | Watchlist |
 | `/symbols` | Instruments |
@@ -107,7 +107,7 @@ Risk is capped at 7-10 pips. Exit at SL.
 
 ## Strategy
 
-All strategy parameters are hardcoded — no user configuration needed:
+All strategy parameters are hardcoded, no user configuration needed:
 
 | Parameter | Value |
 |---|---|

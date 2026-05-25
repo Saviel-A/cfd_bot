@@ -185,32 +185,56 @@ def format_stats_message(stats: dict) -> str:
 
     closed = stats["closed"]
     win_rate = (stats["wins"] / closed * 100) if closed else 0
+    tp_wins = stats["tp1"] + stats["tp2"] + stats["tp3"]
 
     lines = [
         "📊 <b>Stats</b>",
-        f"Signals: <b>{stats['total']}</b> | Open: <b>{stats['open']}</b>",
-        f"Closed: <b>{closed}</b> | Win rate: <b>{win_rate:.1f}%</b>",
-        f"Wins: <b>{stats['wins']}</b> | Losses: <b>{stats['losses']}</b> | Expired: <b>{stats['expired']}</b>",
-        f"TP hits: <b>{stats['tp1']}</b> / <b>{stats['tp2']}</b> / <b>{stats['tp3']}</b>",
+        f"Last <b>{stats['total']}</b> signals",
+        f"Open: <b>{stats['open']}</b> | Closed: <b>{closed}</b>",
+        f"Win rate: <b>{win_rate:.1f}%</b>",
+        "",
+        "<b>Outcomes</b>",
+        f"✅ Wins: <b>{stats['wins']}</b>  |  🛑 SL: <b>{stats['losses']}</b>  |  ⏸ Expired: <b>{stats['expired']}</b>",
+        f"🎯 TP1: <b>{stats['tp1']}</b>  |  🎯 TP2: <b>{stats['tp2']}</b>  |  🏆 TP3: <b>{stats['tp3']}</b>",
     ]
 
+    if tp_wins:
+        lines.append(f"Best outcome: <b>{_best_tp(stats)}</b>")
+
     if stats["best_symbols"]:
-        lines.extend(["", "<b>Best</b>"])
+        lines.extend(["", "<b>By Symbol</b>"])
         for s in stats["best_symbols"]:
             lines.append(
-                    f"{s['symbol']}: {s['wins']} wins / {s['total']} closed"
+                f"{s['symbol']}: {s['wins']}W {s['losses']}L | TP {s['tp1']}/{s['tp2']}/{s['tp3']}"
             )
 
-    if stats["worst_symbols"]:
-        worst_symbols = [s for s in stats["worst_symbols"] if s["losses"]]
-        if worst_symbols:
-            lines.extend(["", "<b>Review</b>"])
-            for s in worst_symbols:
-                lines.append(
-                    f"{s['symbol']}: {s['losses']} losses / {s['total']} closed"
-                )
+    recent_closed = stats.get("recent_closed") or []
+    if recent_closed:
+        lines.extend(["", "<b>Recent Results</b>"])
+        for s in recent_closed[:5]:
+            lines.append(_format_result_line(s))
 
     return "\n".join(lines)
+
+
+def _best_tp(stats: dict) -> str:
+    outcomes = [("TP3", stats["tp3"]), ("TP2", stats["tp2"]), ("TP1", stats["tp1"])]
+    best, count = max(outcomes, key=lambda item: item[1])
+    return f"{best} ({count})"
+
+
+def _format_result_line(signal) -> str:
+    label = {
+        "TP1": "✅ TP1",
+        "TP2": "✅ TP2",
+        "TP3": "🏆 TP3",
+        "SL": "🛑 SL",
+        "EXPIRED": "⏸ Expired",
+        "SUPERSEDED": "🔁 Replaced",
+        "OPEN": "⏳ Open",
+    }.get(signal.outcome, signal.outcome)
+    arrow = "📈" if signal.direction == "BUY" else "📉"
+    return f"{arrow} {signal.symbol} {signal.direction}: <b>{label}</b>"
 
 
 # Signal history
@@ -243,7 +267,10 @@ def format_history_message(signals: list, limit: int = 20) -> str:
             date = str(s.fired_at)[:16]
         lines.append(
             f"\n{dot} <b>{s.symbol} {s.direction}</b> | {outcome}\n"
-            f"Entry { _fmt_alert(float(s.entry_price)) } | {date}"
+            f"Entry: <code>{_fmt_alert(float(s.entry_price))}</code>\n"
+            f"SL: <code>{_fmt_alert(float(s.stop_loss))}</code> | "
+            f"TP: <code>{_fmt_alert(float(s.tp1))}</code> / <code>{_fmt_alert(float(s.tp2))}</code> / <code>{_fmt_alert(float(s.tp3))}</code>\n"
+            f"Time: {date}"
         )
 
     return "\n".join(lines)

@@ -58,7 +58,7 @@ def _outcome_message(signal: Signal, outcome: str, price: float) -> str:
         header = "🎯 <b>TP2 Hit</b>"
         action = f"Lock more profit. Move SL to TP1. Next target: <code>{tp3}</code>"
     elif outcome == "TP3":
-        header = "🏆 <b>TP3 Hit — Full Run!</b>"
+        header = "🏆 <b>TP3 Hit</b>"
         action = "Close the trade. Full target reached."
     elif outcome == "SL":
         header = "🛑 <b>Stop Loss Hit</b>"
