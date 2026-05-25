@@ -22,6 +22,7 @@ from src.market_pressure import analyze_market_pressure, pressure_confirms
 from src.chart import generate_chart
 from src.calendar import check_news_risk
 from src.trading_hours import _is_open, symbol_market_status
+from src.signal_profiles import signal_profile, stale_candle_reason
 
 logger = logging.getLogger(__name__)
 
@@ -51,12 +52,24 @@ async def scan_symbol(symbol: str) -> dict | None:
     try:
         cfg_inst = load_instrument_cfg(symbol)
         ticker   = cfg_inst.get("ticker", symbol)
+        profile  = signal_profile(symbol)
 
-        df     = await _fetch(ticker, cfg.DEFAULT_TIMEFRAME)
-        df_htf = await _fetch(ticker, cfg.HTF_TIMEFRAME, lookback=300)
+        df     = await _fetch(ticker, profile["entry_timeframe"])
+        df_htf = await _fetch(ticker, profile["htf_timeframe"], lookback=300)
         df     = compute_all(df, cfg_inst)
 
-        signal = generate_signal(df, SIGNAL_CFG, cfg_inst, df_htf=df_htf)
+        signal = generate_signal(
+            df,
+            SIGNAL_CFG,
+            cfg_inst,
+            df_htf=df_htf,
+            htf_label=profile["htf_label"],
+            entry_label=profile["entry_label"],
+        )
+        stale_reason = stale_candle_reason(df, profile["entry_timeframe"], symbol)
+        if stale_reason:
+            signal.direction = "HOLD"
+            signal.reason = stale_reason
         pressure = analyze_market_pressure(df)
 
         if signal.direction in ("BUY", "SELL") and not pressure_confirms(signal.direction, pressure):
@@ -236,13 +249,15 @@ async def run_scan_loop(bot, interval_minutes: int = 60):
                             signal = result["signal"]
                             atr    = result.get("atr", 0)
 
-                            # Suppress duplicate same-direction signal within 4h
+                            # Suppress duplicate same-direction signals for the active profile.
                             async with AsyncSessionLocal() as session:
                                 last = await get_last_signal_for_symbol(session, symbol)
                                 if last and last.direction == signal.direction:
                                     fired = last.fired_at if last.fired_at.tzinfo else last.fired_at.replace(tzinfo=timezone.utc)
-                                    if datetime.now(timezone.utc) - fired < timedelta(hours=4):
-                                        logger.info(f"{symbol}: {signal.direction} already sent within 4h, suppressed")
+                                    cooldown = timedelta(minutes=signal_profile(symbol)["duplicate_cooldown_minutes"])
+                                    if datetime.now(timezone.utc) - fired < cooldown:
+                                        minutes = int(cooldown.total_seconds() // 60)
+                                        logger.info(f"{symbol}: {signal.direction} already sent within {minutes}m, suppressed")
                                         continue
 
                             # Fetch live price and recalculate trade
@@ -265,7 +280,7 @@ async def run_scan_loop(bot, interval_minutes: int = 60):
                                     await save_signal(session, {
                                         "symbol":           symbol,
                                         "direction":        signal.direction,
-                                        "timeframe":        cfg.DEFAULT_TIMEFRAME,
+                                        "timeframe":        signal_profile(symbol)["entry_timeframe"],
                                         "entry_price":      entry_for_db,
                                         "stop_loss":        trade.stop_loss if trade else entry_for_db,
                                         "tp1":              trade.tp1 if trade else entry_for_db,

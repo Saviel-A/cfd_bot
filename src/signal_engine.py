@@ -60,6 +60,8 @@ def generate_signal(
     settings: dict,
     instrument_cfg: dict,
     df_htf: pd.DataFrame | None = None,
+    htf_label: str = "4H",
+    entry_label: str = "1H",
 ) -> Signal:
     sig_cfg       = settings.get("signals", {})
     min_confluence = sig_cfg.get("min_confluence", 3)
@@ -88,25 +90,25 @@ def generate_signal(
     if htf_bias == "NEUTRAL":
         raw_dir = "HOLD"
         strength = max(bull_count, bear_count)
-        reason = "4H trend is neutral"
+        reason = f"{htf_label} trend is neutral"
     elif htf_bias == "BULLISH" and bull_count >= min_confluence:
         raw_dir = "BUY"
         strength = bull_count
-        reason = "4H bullish trend + 1H bullish confirmation"
+        reason = f"{htf_label} bullish trend + {entry_label} bullish confirmation"
         if rsi > 70:
             raw_dir = "HOLD"
             reason = "BUY blocked: RSI is overbought"
     elif htf_bias == "BEARISH" and bear_count >= min_confluence:
         raw_dir = "SELL"
         strength = bear_count
-        reason = "4H bearish trend + 1H bearish confirmation"
+        reason = f"{htf_label} bearish trend + {entry_label} bearish confirmation"
         if rsi < 30:
             raw_dir = "HOLD"
             reason = "SELL blocked: RSI is oversold"
     elif htf_bias == "BULLISH" and bear_count == len(votes):
         raw_dir = "SELL"
         strength = bear_count
-        reason = "4H bullish + full 1H bearish override"
+        reason = f"{htf_label} bullish + full {entry_label} bearish override"
         is_counter_trend = True
         if rsi < 30:
             raw_dir = "HOLD"
@@ -115,7 +117,7 @@ def generate_signal(
     elif htf_bias == "BEARISH" and bull_count == len(votes):
         raw_dir = "BUY"
         strength = bull_count
-        reason = "4H bearish + full 1H bullish override"
+        reason = f"{htf_label} bearish + full {entry_label} bullish override"
         is_counter_trend = True
         if rsi > 70:
             raw_dir = "HOLD"
@@ -125,9 +127,9 @@ def generate_signal(
         raw_dir = "HOLD"
         strength = max(bull_count, bear_count)
         if htf_bias == "BULLISH" and bear_count >= min_confluence:
-            reason = "SELL blocked: counter-trend to 4H bullish bias"
+            reason = f"SELL blocked: counter-trend to {htf_label} bullish bias"
         elif htf_bias == "BEARISH" and bull_count >= min_confluence:
-            reason = "BUY blocked: counter-trend to 4H bearish bias"
+            reason = f"BUY blocked: counter-trend to {htf_label} bearish bias"
         else:
             reason = "Not enough aligned confirmation"
 

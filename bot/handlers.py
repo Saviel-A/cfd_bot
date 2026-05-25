@@ -31,8 +31,9 @@ from src.market_pressure import analyze_market_pressure, pressure_confirms
 from src.news import get_news, format_news_message
 from src.trading_hours import get_hours_message, symbol_market_status
 from src.calendar import get_calendar, format_calendar_message
-from bot.config import cfg, SIGNAL_CFG, RISK_CFG
+from bot.config import cfg, SIGNAL_CFG, RISK_CFG, COUNTER_TREND_RISK_CFG
 from src.chart import generate_chart
+from src.signal_profiles import signal_profile, stale_candle_reason
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -167,13 +168,25 @@ def _commands_text(name: str) -> str:
 async def _scan_symbol(symbol: str) -> dict:
     cfg_inst = load_instrument_cfg(symbol)
     ticker   = cfg_inst.get("ticker", symbol)
+    profile  = signal_profile(symbol)
 
     loop   = asyncio.get_running_loop()
-    df     = await loop.run_in_executor(None, lambda: fetch_ohlcv(ticker, timeframe=cfg.DEFAULT_TIMEFRAME, lookback=200))
-    df_htf = await loop.run_in_executor(None, lambda: fetch_ohlcv(ticker, timeframe=cfg.HTF_TIMEFRAME, lookback=300))
+    df     = await loop.run_in_executor(None, lambda: fetch_ohlcv(ticker, timeframe=profile["entry_timeframe"], lookback=200))
+    df_htf = await loop.run_in_executor(None, lambda: fetch_ohlcv(ticker, timeframe=profile["htf_timeframe"], lookback=300))
     df     = compute_all(df, cfg_inst)
 
-    signal = generate_signal(df, SIGNAL_CFG, cfg_inst, df_htf=df_htf)
+    signal = generate_signal(
+        df,
+        SIGNAL_CFG,
+        cfg_inst,
+        df_htf=df_htf,
+        htf_label=profile["htf_label"],
+        entry_label=profile["entry_label"],
+    )
+    stale_reason = stale_candle_reason(df, profile["entry_timeframe"], symbol)
+    if stale_reason:
+        signal.direction = "HOLD"
+        signal.reason = stale_reason
     pressure = analyze_market_pressure(df)
     if signal.direction in ("BUY", "SELL") and not pressure_confirms(signal.direction, pressure):
         signal.reason = f"{signal.direction} blocked: {pressure.reason}"
@@ -182,7 +195,8 @@ async def _scan_symbol(symbol: str) -> dict:
     atr   = float(df.iloc[-1].get("atr", 0) or 0)
     trade = None
     if signal.direction in ("BUY", "SELL"):
-        trade = calculate_trade(signal.direction, signal.current_price, atr, RISK_CFG, symbol=symbol)
+        risk = COUNTER_TREND_RISK_CFG if signal.is_counter_trend else RISK_CFG
+        trade = calculate_trade(signal.direction, signal.current_price, atr, risk, symbol=symbol)
         if trade is None:
             signal.reason = f"{signal.direction} blocked: risk levels unavailable"
             signal.direction = "HOLD"
@@ -589,7 +603,8 @@ async def cb_home(callback: CallbackQuery):
                 except Exception:
                     pass
                 if live_price and atr > 0:
-                    trade = calculate_trade(signal.direction, live_price, atr, RISK_CFG, symbol=symbol)
+                    risk = COUNTER_TREND_RISK_CFG if signal.is_counter_trend else RISK_CFG
+                    trade = calculate_trade(signal.direction, live_price, atr, risk, symbol=symbol)
 
                 result["live_price"] = live_price
                 result["trade"] = trade
@@ -600,7 +615,7 @@ async def cb_home(callback: CallbackQuery):
                         await save_signal(session, {
                             "symbol":           symbol,
                             "direction":        signal.direction,
-                            "timeframe":        cfg.DEFAULT_TIMEFRAME,
+                            "timeframe":        signal_profile(symbol)["entry_timeframe"],
                             "entry_price":      entry_for_db,
                             "stop_loss":        trade.stop_loss if trade else entry_for_db,
                             "tp1":              trade.tp1 if trade else entry_for_db,
@@ -1209,7 +1224,8 @@ async def cmd_scan(message: Message):
             except Exception:
                 pass
             if live_price and atr > 0:
-                trade = calculate_trade(signal.direction, live_price, atr, RISK_CFG, symbol=symbol)
+                risk = COUNTER_TREND_RISK_CFG if signal.is_counter_trend else RISK_CFG
+                trade = calculate_trade(signal.direction, live_price, atr, risk, symbol=symbol)
 
             result["live_price"] = live_price
             result["trade"] = trade
@@ -1220,7 +1236,7 @@ async def cmd_scan(message: Message):
                     await save_signal(session, {
                         "symbol":           symbol,
                         "direction":        signal.direction,
-                        "timeframe":        cfg.DEFAULT_TIMEFRAME,
+                        "timeframe":        signal_profile(symbol)["entry_timeframe"],
                         "entry_price":      entry_for_db,
                         "stop_loss":        trade.stop_loss if trade else entry_for_db,
                         "tp1":              trade.tp1 if trade else entry_for_db,
