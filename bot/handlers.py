@@ -10,7 +10,7 @@ from datetime import datetime, timezone, timedelta
 
 from aiogram import Router, F
 from aiogram.filters import Command, CommandStart
-from aiogram.types import Message, CallbackQuery, PreCheckoutQuery, LabeledPrice, ChatJoinRequest
+from aiogram.types import Message, CallbackQuery, PreCheckoutQuery, LabeledPrice, ChatJoinRequest, ErrorEvent
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from bot.db.session import AsyncSessionLocal
@@ -81,6 +81,48 @@ def _menu_markup_main():
     builder.button(text="📲 Share Link",   callback_data="home:sharelink")
     builder.adjust(2)
     return builder.as_markup()
+
+
+def _is_db_error(exc: Exception) -> bool:
+    text = str(exc)
+    return "Connect call failed" in text or "5432" in text or "asyncpg" in text
+
+
+async def _send_error_notice(event: ErrorEvent) -> bool:
+    exc = event.exception
+    logger.exception("Unhandled bot update error", exc_info=exc)
+
+    if _is_db_error(exc):
+        text = (
+            "⚠️ <b>Database Offline</b>\n\n"
+            "The bot is online, but commands that need saved data cannot load right now.\n"
+            "Start Docker/Postgres, then try again."
+        )
+        alert = "Database is offline. Start Docker/Postgres."
+    else:
+        text = "⚠️ <b>Command Failed</b>\n\nCheck the bot logs and try again."
+        alert = "Command failed. Check logs."
+
+    update = event.update
+    callback = update.callback_query
+    message = update.message
+
+    try:
+        if callback:
+            await callback.answer(alert, show_alert=True)
+            if callback.message:
+                await callback.message.answer(text, parse_mode="HTML")
+            return True
+        if message:
+            await message.answer(text, parse_mode="HTML")
+            return True
+    except Exception:
+        logger.exception("Failed to send error notice")
+
+    return True
+
+
+router.errors.register(_send_error_notice)
 
 
 def _symbol_buttons(builder: InlineKeyboardBuilder, symbols: list[str], prefix: str) -> None:
@@ -185,14 +227,6 @@ async def _send_closed_symbol_chart(target, symbol: str, edit_message=None):
 @router.message(CommandStart())
 @router.message(Command("help"))
 async def cmd_start(message: Message):
-    async with AsyncSessionLocal() as session:
-        await get_or_create_user(
-            session,
-            message.from_user.id,
-            message.from_user.username,
-            message.from_user.first_name,
-        )
-
     name = message.from_user.first_name or message.from_user.username or "there"
 
     # Owner
@@ -203,6 +237,17 @@ async def cmd_start(message: Message):
             reply_markup=_menu_markup_main(),
         )
         return
+
+    try:
+        async with AsyncSessionLocal() as session:
+            await get_or_create_user(
+                session,
+                message.from_user.id,
+                message.from_user.username,
+                message.from_user.first_name,
+            )
+    except Exception as exc:
+        logger.warning(f"Could not register user {message.from_user.id}: {exc}")
 
     # User: show subscription page (direct or via deep link)
     builder = InlineKeyboardBuilder()
@@ -1540,13 +1585,16 @@ async def catch_all_user(message: Message):
     if _is_owner(message.from_user.id):
         return  # owner's unhandled messages — ignore silently
 
-    async with AsyncSessionLocal() as session:
-        await get_or_create_user(
-            session,
-            message.from_user.id,
-            message.from_user.username,
-            message.from_user.first_name,
-        )
+    try:
+        async with AsyncSessionLocal() as session:
+            await get_or_create_user(
+                session,
+                message.from_user.id,
+                message.from_user.username,
+                message.from_user.first_name,
+            )
+    except Exception as exc:
+        logger.warning(f"Could not register user {message.from_user.id}: {exc}")
 
     name = message.from_user.first_name or message.from_user.username or "there"
     builder = InlineKeyboardBuilder()
