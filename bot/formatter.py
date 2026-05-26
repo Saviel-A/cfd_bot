@@ -1,7 +1,7 @@
 """Telegram message formatter."""
 
 from src.signal_engine import Signal
-from src.risk_manager import TradeParams, get_pip_size
+from src.risk_manager import TradeParams
 from src.trading_hours import symbol_market_status
 from src.instruments import get_symbol_label
 from typing import Optional
@@ -23,11 +23,6 @@ def _fmt_distance(value: float) -> str:
     if value < 1:
         return f"{value:.5f}".rstrip("0").rstrip(".")
     return f"{int(round(value))}"
-
-
-def _to_pips(distance: float, symbol: str) -> int:
-    pip = get_pip_size(symbol)
-    return int(round(distance / pip))
 
 
 def _vote_label(value: int) -> str:
@@ -98,7 +93,6 @@ def format_signal_message(
     tp1   = f"<code>{_fmt_alert(trade.tp1)}</code>"       if trade else "N/A"
     tp2   = f"<code>{_fmt_alert(trade.tp2)}</code>"       if trade else "N/A"
     tp3   = f"<code>{_fmt_alert(trade.tp3)}</code>"       if trade else "N/A"
-    pips  = f"{_to_pips(trade.sl_distance, symbol)} pips" if trade else "N/A"
 
     news = _news_line(news_risk, news_events)
     pressure = _pressure_line(market_pressure)
@@ -108,12 +102,11 @@ def format_signal_message(
         f"{arrow} <b>{name} {label}</b>\n"
         f"Setup: {reason}\n\n"
         f"Entry: {entry}\n"
-        f"SL: {sl}  🛑 {pips}\n"
+        f"SL: {sl}\n"
         f"TP1: {tp1}\n"
         f"TP2: {tp2}\n"
         f"TP3: {tp3}\n\n"
-        f"{news} | {pressure}\n"
-        f"<i>Risk is capped at 7-10 pips. Exit at SL.</i>"
+        f"{news} | {pressure}"
     )
 
 
