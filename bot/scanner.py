@@ -191,6 +191,85 @@ async def _broadcast_signal(bot, symbol: str, result: dict):
             return False
 
 
+async def _duplicate_suppression_reason(symbol: str, direction: str) -> str | None:
+    """Return a reason when a same-direction signal is still inside cooldown."""
+    async with AsyncSessionLocal() as session:
+        last = await get_last_signal_for_symbol(session, symbol)
+        if not last or last.direction != direction:
+            return None
+
+        fired = last.fired_at if last.fired_at.tzinfo else last.fired_at.replace(tzinfo=timezone.utc)
+        cooldown = timedelta(minutes=signal_profile(symbol)["duplicate_cooldown_minutes"])
+        remaining = cooldown - (datetime.now(timezone.utc) - fired)
+        if remaining <= timedelta(0):
+            return None
+
+        minutes = max(1, int(remaining.total_seconds() // 60))
+        return f"{direction} already sent. Cooldown: {minutes}m left"
+
+
+async def _prepare_live_trade(symbol: str, result: dict) -> tuple[float | None, object | None]:
+    signal = result["signal"]
+    trade = result["trade"]
+    atr = result.get("atr", 0)
+    loop = asyncio.get_running_loop()
+
+    live_price = None
+    try:
+        live_price = await loop.run_in_executor(None, lambda s=symbol: get_live_price(s))
+    except Exception:
+        pass
+
+    if live_price and atr > 0:
+        risk = COUNTER_TREND_RISK_CFG if signal.is_counter_trend else RISK_CFG
+        trade = calculate_trade(signal.direction, live_price, atr, risk, symbol=symbol)
+
+    return live_price, trade
+
+
+async def _save_sent_signal(symbol: str, result: dict, live_price, trade):
+    signal = result["signal"]
+    entry_for_db = live_price if live_price else signal.current_price
+    async with AsyncSessionLocal() as session:
+        await save_signal(session, {
+            "symbol":           symbol,
+            "direction":        signal.direction,
+            "timeframe":        signal_profile(symbol)["entry_timeframe"],
+            "entry_price":      entry_for_db,
+            "stop_loss":        trade.stop_loss if trade else entry_for_db,
+            "tp1":              trade.tp1 if trade else entry_for_db,
+            "tp2":              trade.tp2 if trade else entry_for_db,
+            "tp3":              trade.tp3 if trade else entry_for_db,
+            "sl_distance":      trade.sl_distance if trade else None,
+            "atr":              trade.atr if trade else None,
+            "confluence_score": signal.strength,
+            "confluence_total": signal.total_indicators,
+            "indicator_votes":  signal.details,
+        })
+
+
+async def broadcast_signal_if_allowed(bot, symbol: str, result: dict) -> tuple[bool, str | None]:
+    """Broadcast and persist a signal using the same rules for all scan paths."""
+    signal = result["signal"]
+    if signal.direction not in ("BUY", "SELL"):
+        return False, signal.reason or "No clean setup"
+
+    duplicate_reason = await _duplicate_suppression_reason(symbol, signal.direction)
+    if duplicate_reason:
+        logger.info(f"{symbol}: {duplicate_reason}")
+        return False, duplicate_reason
+
+    live_price, trade = await _prepare_live_trade(symbol, result)
+    result["live_price"] = live_price
+    result["trade"] = trade
+
+    sent = await _broadcast_signal(bot, symbol, result)
+    if sent:
+        await _save_sent_signal(symbol, result, live_price, trade)
+        return True, None
+    return False, "Broadcast failed"
+
+
 async def run_scan_loop(bot, interval_minutes: int = 60):
     logger.info(f"Scanner started: scanning every {interval_minutes}m")
 
@@ -251,52 +330,9 @@ async def run_scan_loop(bot, interval_minutes: int = 60):
                                 logger.info(f"{symbol}: no signal - {reason}")
                                 continue
 
-                            signal = result["signal"]
-                            atr    = result.get("atr", 0)
-
-                            # Suppress duplicate same-direction signals for the active profile.
-                            async with AsyncSessionLocal() as session:
-                                last = await get_last_signal_for_symbol(session, symbol)
-                                if last and last.direction == signal.direction:
-                                    fired = last.fired_at if last.fired_at.tzinfo else last.fired_at.replace(tzinfo=timezone.utc)
-                                    cooldown = timedelta(minutes=signal_profile(symbol)["duplicate_cooldown_minutes"])
-                                    if datetime.now(timezone.utc) - fired < cooldown:
-                                        minutes = int(cooldown.total_seconds() // 60)
-                                        logger.info(f"{symbol}: {signal.direction} already sent within {minutes}m, suppressed")
-                                        continue
-
-                            # Fetch live price and recalculate trade
-                            live_price = None
-                            try:
-                                live_price = await loop.run_in_executor(None, lambda s=symbol: get_live_price(s))
-                            except Exception:
-                                pass
-                            trade = result["trade"]
-                            if live_price and atr > 0:
-                                risk = COUNTER_TREND_RISK_CFG if signal.is_counter_trend else RISK_CFG
-                                trade = calculate_trade(signal.direction, live_price, atr, risk, symbol=symbol)
-
-                            result["live_price"] = live_price
-                            result["trade"]      = trade
-                            sent = await _broadcast_signal(bot, symbol, result)
-                            if sent:
-                                entry_for_db = live_price if live_price else signal.current_price
-                                async with AsyncSessionLocal() as session:
-                                    await save_signal(session, {
-                                        "symbol":           symbol,
-                                        "direction":        signal.direction,
-                                        "timeframe":        signal_profile(symbol)["entry_timeframe"],
-                                        "entry_price":      entry_for_db,
-                                        "stop_loss":        trade.stop_loss if trade else entry_for_db,
-                                        "tp1":              trade.tp1 if trade else entry_for_db,
-                                        "tp2":              trade.tp2 if trade else entry_for_db,
-                                        "tp3":              trade.tp3 if trade else entry_for_db,
-                                        "sl_distance":      trade.sl_distance if trade else None,
-                                        "atr":              trade.atr if trade else None,
-                                        "confluence_score": signal.strength,
-                                        "confluence_total": signal.total_indicators,
-                                        "indicator_votes":  signal.details,
-                                    })
+                            sent, reason = await broadcast_signal_if_allowed(bot, symbol, result)
+                            if not sent and reason:
+                                logger.info(f"{symbol}: no broadcast - {reason}")
 
                         except Exception as e:
                             logger.error(f"Error processing {symbol}: {e}", exc_info=True)

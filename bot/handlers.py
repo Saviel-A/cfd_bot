@@ -16,7 +16,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from bot.db.session import AsyncSessionLocal
 from bot.db.repositories.user_repo import get_or_create_user, grant_premium_until
 from bot.db.repositories.watchlist_repo import get_watchlist, add_symbol, remove_symbol
-from bot.db.repositories.signal_repo import get_recent_signals, get_signal_stats, clear_all_signals, save_signal
+from bot.db.repositories.signal_repo import get_recent_signals, get_signal_stats, clear_all_signals
 from bot.formatter import (
     format_signal_message, format_hold_message, format_watchlist_message,
     format_history_message, format_stats_message, format_market_closed_message,
@@ -560,9 +560,7 @@ async def cb_home(callback: CallbackQuery):
 
     # Scan Now
     elif action == "scan":
-        from bot.scanner import scan_symbol, _market_open_now, _broadcast_market_closed, _broadcast_signal
-        from src.data_fetcher import get_live_price
-        from src.risk_manager import calculate_trade
+        from bot.scanner import scan_symbol, _market_open_now, _broadcast_market_closed, broadcast_signal_if_allowed
         from src.trading_hours import symbol_market_status
         market_open = _market_open_now()
         await callback.message.edit_text(
@@ -593,41 +591,12 @@ async def cb_home(callback: CallbackQuery):
                     reason = result["signal"].reason or "No clean setup"
                     holds.append(f"{symbol}: {reason}")
                     continue
-                signal = result["signal"]
-                trade  = result["trade"]
-                atr    = result.get("atr", 0)
 
-                live_price = None
-                try:
-                    live_price = await loop.run_in_executor(None, lambda s=symbol: get_live_price(s))
-                except Exception:
-                    pass
-                if live_price and atr > 0:
-                    risk = COUNTER_TREND_RISK_CFG if signal.is_counter_trend else RISK_CFG
-                    trade = calculate_trade(signal.direction, live_price, atr, risk, symbol=symbol)
-
-                result["live_price"] = live_price
-                result["trade"] = trade
-                sent = await _broadcast_signal(callback.bot, symbol, result)
+                sent, reason = await broadcast_signal_if_allowed(callback.bot, symbol, result)
                 if sent:
-                    entry_for_db = live_price if live_price else signal.current_price
-                    async with AsyncSessionLocal() as session:
-                        await save_signal(session, {
-                            "symbol":           symbol,
-                            "direction":        signal.direction,
-                            "timeframe":        signal_profile(symbol)["entry_timeframe"],
-                            "entry_price":      entry_for_db,
-                            "stop_loss":        trade.stop_loss if trade else entry_for_db,
-                            "tp1":              trade.tp1 if trade else entry_for_db,
-                            "tp2":              trade.tp2 if trade else entry_for_db,
-                            "tp3":              trade.tp3 if trade else entry_for_db,
-                            "sl_distance":      trade.sl_distance if trade else None,
-                            "atr":              trade.atr if trade else None,
-                            "confluence_score": signal.strength,
-                            "confluence_total": signal.total_indicators,
-                            "indicator_votes":  signal.details,
-                        })
                     fired += 1
+                elif reason:
+                    holds.append(f"{symbol}: {reason}")
             except Exception as e:
                 logger.error(f"Scan error {symbol}: {e}")
                 errors.append(f"{symbol}: {e}")
@@ -964,7 +933,8 @@ async def cmd_signal(message: Message):
                 pass
             trade = r["trade"]
             if live_price and r["atr"] > 0:
-                trade = calculate_trade(r["signal"].direction, live_price, r["atr"], RISK_CFG, symbol=symbol)
+                risk = COUNTER_TREND_RISK_CFG if r["signal"].is_counter_trend else RISK_CFG
+                trade = calculate_trade(r["signal"].direction, live_price, r["atr"], risk, symbol=symbol)
             text = format_signal_message(
                 r["display_name"], r["signal"], trade,
                 symbol=r["symbol"], live_price=live_price,
@@ -1017,7 +987,8 @@ async def cb_scan_symbol(callback: CallbackQuery):
                 pass
             trade = r["trade"]
             if live_price and r["atr"] > 0:
-                trade = calculate_trade(r["signal"].direction, live_price, r["atr"], RISK_CFG, symbol=symbol)
+                risk = COUNTER_TREND_RISK_CFG if r["signal"].is_counter_trend else RISK_CFG
+                trade = calculate_trade(r["signal"].direction, live_price, r["atr"], risk, symbol=symbol)
             text = format_signal_message(
                 r["display_name"], r["signal"], trade,
                 symbol=r["symbol"], live_price=live_price,
@@ -1180,9 +1151,7 @@ async def cmd_stats(message: Message):
 @router.message(Command("scan"))
 async def cmd_scan(message: Message):
     if not await _check_owner(message): return
-    from bot.scanner import scan_symbol, _market_open_now, _broadcast_market_closed, _broadcast_signal
-    from src.risk_manager import calculate_trade
-    from src.data_fetcher import get_live_price
+    from bot.scanner import scan_symbol, _market_open_now, _broadcast_market_closed, broadcast_signal_if_allowed
     from src.trading_hours import symbol_market_status
     market_open = _market_open_now()
     async with AsyncSessionLocal() as session:
@@ -1214,41 +1183,12 @@ async def cmd_scan(message: Message):
                 reason = result["signal"].reason or "No clean setup"
                 holds.append(f"{symbol}: {reason}")
                 continue
-            signal = result["signal"]
-            trade  = result["trade"]
-            atr    = result.get("atr", 0)
 
-            live_price = None
-            try:
-                live_price = await loop.run_in_executor(None, lambda s=symbol: get_live_price(s))
-            except Exception:
-                pass
-            if live_price and atr > 0:
-                risk = COUNTER_TREND_RISK_CFG if signal.is_counter_trend else RISK_CFG
-                trade = calculate_trade(signal.direction, live_price, atr, risk, symbol=symbol)
-
-            result["live_price"] = live_price
-            result["trade"] = trade
-            sent = await _broadcast_signal(message.bot, symbol, result)
+            sent, reason = await broadcast_signal_if_allowed(message.bot, symbol, result)
             if sent:
-                entry_for_db = live_price if live_price else signal.current_price
-                async with AsyncSessionLocal() as session:
-                    await save_signal(session, {
-                        "symbol":           symbol,
-                        "direction":        signal.direction,
-                        "timeframe":        signal_profile(symbol)["entry_timeframe"],
-                        "entry_price":      entry_for_db,
-                        "stop_loss":        trade.stop_loss if trade else entry_for_db,
-                        "tp1":              trade.tp1 if trade else entry_for_db,
-                        "tp2":              trade.tp2 if trade else entry_for_db,
-                        "tp3":              trade.tp3 if trade else entry_for_db,
-                        "sl_distance":      trade.sl_distance if trade else None,
-                        "atr":              trade.atr if trade else None,
-                        "confluence_score": signal.strength,
-                        "confluence_total": signal.total_indicators,
-                        "indicator_votes":  signal.details,
-                    })
                 fired += 1
+            elif reason:
+                holds.append(f"{symbol}: {reason}")
         except Exception as e:
             logger.error(f"Scan error {symbol}: {e}")
             errors.append(f"{symbol}: {e}")
