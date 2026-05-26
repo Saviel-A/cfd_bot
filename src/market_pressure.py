@@ -80,3 +80,18 @@ def analyze_market_pressure(df: pd.DataFrame, lookback: int = 12) -> MarketPress
 def pressure_confirms(direction: str, pressure: MarketPressure) -> bool:
     """True when recent pressure supports the proposed signal direction."""
     return pressure.aligned_direction == direction
+
+
+def should_block_by_pressure(symbol: str, signal, pressure: MarketPressure) -> bool:
+    """Return True when pressure should block a signal.
+
+    Gold is intentionally more active: a perfect intraday confluence setup is
+    allowed through with pressure shown as a warning in the alert.
+    """
+    if pressure_confirms(signal.direction, pressure):
+        return False
+
+    if symbol.upper() in {"XAUUSD", "GOLD"} and signal.strength >= signal.total_indicators:
+        return False
+
+    return True

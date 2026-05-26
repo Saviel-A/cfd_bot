@@ -18,7 +18,7 @@ from src.data_fetcher import fetch_ohlcv, get_live_price
 from src.indicators import compute_all
 from src.signal_engine import generate_signal
 from src.risk_manager import calculate_trade
-from src.market_pressure import analyze_market_pressure, pressure_confirms
+from src.market_pressure import analyze_market_pressure, should_block_by_pressure
 from src.chart import generate_chart
 from src.calendar import check_news_risk
 from src.trading_hours import _is_open, symbol_market_status
@@ -72,7 +72,7 @@ async def scan_symbol(symbol: str) -> dict | None:
             signal.reason = stale_reason
         pressure = analyze_market_pressure(df)
 
-        if signal.direction in ("BUY", "SELL") and not pressure_confirms(signal.direction, pressure):
+        if signal.direction in ("BUY", "SELL") and should_block_by_pressure(symbol, signal, pressure):
             signal.reason = f"{signal.direction} blocked: {pressure.reason}"
             signal.direction = "HOLD"
 
