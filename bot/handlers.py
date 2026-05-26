@@ -551,7 +551,12 @@ async def cb_home(callback: CallbackQuery):
                     holds.append(f"{symbol}: {reason}")
                     continue
 
-                sent, reason = await broadcast_signal_if_allowed(callback.bot, symbol, result)
+                sent, reason = await broadcast_signal_if_allowed(
+                    callback.bot,
+                    symbol,
+                    result,
+                    enforce_cooldown=False,
+                )
                 if sent:
                     fired += 1
                 elif reason:
@@ -1143,7 +1148,12 @@ async def cmd_scan(message: Message):
                 holds.append(f"{symbol}: {reason}")
                 continue
 
-            sent, reason = await broadcast_signal_if_allowed(message.bot, symbol, result)
+            sent, reason = await broadcast_signal_if_allowed(
+                message.bot,
+                symbol,
+                result,
+                enforce_cooldown=False,
+            )
             if sent:
                 fired += 1
             elif reason:

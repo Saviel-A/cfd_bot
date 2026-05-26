@@ -250,16 +250,23 @@ async def _save_sent_signal(symbol: str, result: dict, live_price, trade):
         })
 
 
-async def broadcast_signal_if_allowed(bot, symbol: str, result: dict) -> tuple[bool, str | None]:
+async def broadcast_signal_if_allowed(
+    bot,
+    symbol: str,
+    result: dict,
+    *,
+    enforce_cooldown: bool = True,
+) -> tuple[bool, str | None]:
     """Broadcast and persist a signal using the same rules for all scan paths."""
     signal = result["signal"]
     if signal.direction not in ("BUY", "SELL"):
         return False, signal.reason or "No clean setup"
 
-    duplicate_reason = await _duplicate_suppression_reason(symbol, signal.direction)
-    if duplicate_reason:
-        logger.info(f"{symbol}: {duplicate_reason}")
-        return False, duplicate_reason
+    if enforce_cooldown:
+        duplicate_reason = await _duplicate_suppression_reason(symbol, signal.direction)
+        if duplicate_reason:
+            logger.info(f"{symbol}: {duplicate_reason}")
+            return False, duplicate_reason
 
     live_price, trade = await _prepare_live_trade(symbol, result)
     result["live_price"] = live_price
