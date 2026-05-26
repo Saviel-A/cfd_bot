@@ -85,11 +85,19 @@ def pressure_confirms(direction: str, pressure: MarketPressure) -> bool:
 def should_block_by_pressure(symbol: str, signal, pressure: MarketPressure) -> bool:
     """Return True when pressure should block a signal.
 
-    Gold is intentionally more active: a perfect intraday confluence setup is
-    allowed through with pressure shown as a warning in the alert.
+    Gold is intentionally more active, but strong opposite pressure still blocks.
+    A perfect intraday setup can pass only when pressure is mixed or mildly
+    opposite.
     """
     if pressure_confirms(signal.direction, pressure):
         return False
+
+    strong_opposite = (
+        (signal.direction == "BUY" and pressure.direction == "SELLERS" and pressure.sell_pct >= 65)
+        or (signal.direction == "SELL" and pressure.direction == "BUYERS" and pressure.buy_pct >= 65)
+    )
+    if strong_opposite:
+        return True
 
     if symbol.upper() in {"XAUUSD", "GOLD"} and signal.strength >= signal.total_indicators:
         return False
