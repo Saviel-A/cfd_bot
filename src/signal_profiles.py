@@ -22,7 +22,7 @@ def signal_profile(symbol: str) -> dict:
             "entry_label": "15M",
             "htf_timeframe": "1h",
             "htf_label": "1H",
-            "duplicate_cooldown_minutes": 45,
+            "duplicate_cooldown_minutes": 60,
         }
     return {
         "entry_timeframe": cfg.DEFAULT_TIMEFRAME,

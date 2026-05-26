@@ -1,6 +1,6 @@
 """
 Outcome Tracker: runs every 15 minutes.
-Checks all OPEN signals, detects if TP1/TP2/TP3/SL was hit,
+Checks all OPEN signals, detects if final TP/SL was hit,
 updates the DB, and posts the result to the broadcast channel.
 Signals open for more than 48 hours are marked EXPIRED.
 """
@@ -30,13 +30,9 @@ def _check_outcome(signal: Signal, price: float) -> str | None:
 
     if signal.direction == "BUY":
         if price >= tp3: return "TP3"
-        if price >= tp2: return "TP2"
-        if price >= tp1: return "TP1"
         if price <= sl:  return "SL"
     else:
         if price <= tp3: return "TP3"
-        if price <= tp2: return "TP2"
-        if price <= tp1: return "TP1"
         if price >= sl:  return "SL"
     return None
 
@@ -51,13 +47,7 @@ def _outcome_message(signal: Signal, outcome: str, price: float) -> str:
     tp3   = _fmt(float(signal.tp3))
     now   = _fmt(price)
 
-    if outcome == "TP1":
-        header = "🎯 <b>TP1 Hit</b>"
-        action = f"Lock partial profit. Move SL to entry <code>{entry}</code>. Next target: <code>{tp2}</code>"
-    elif outcome == "TP2":
-        header = "🎯 <b>TP2 Hit</b>"
-        action = f"Lock more profit. Move SL to TP1. Next target: <code>{tp3}</code>"
-    elif outcome == "TP3":
+    if outcome == "TP3":
         header = "🏆 <b>TP3 Hit</b>"
         action = "Close the trade. Full target reached."
     elif outcome == "SL":

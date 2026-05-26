@@ -101,7 +101,7 @@ def should_block_by_pressure(symbol: str, signal, pressure: MarketPressure) -> b
 
     if symbol.upper() in {"XAUUSD", "GOLD"}:
         if signal.is_counter_trend:
-            return signal.strength < signal.total_indicators
+            return True
         if pressure.direction == "MIXED" and signal.strength >= 3:
             return False
 

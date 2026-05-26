@@ -61,7 +61,8 @@ async def get_signal_stats(session: AsyncSession, limit: int = 100) -> dict:
     )
     signals = result.scalars().all()
     closed = [s for s in signals if s.outcome not in ("OPEN", "SUPERSEDED")]
-    wins = [s for s in closed if s.outcome in ("TP1", "TP2", "TP3")]
+    wins = [s for s in closed if s.outcome == "TP3"]
+    partials = [s for s in closed if s.outcome in ("TP1", "TP2")]
     losses = [s for s in closed if s.outcome == "SL"]
     expired = [s for s in closed if s.outcome == "EXPIRED"]
 
@@ -72,6 +73,7 @@ async def get_signal_stats(session: AsyncSession, limit: int = 100) -> dict:
             {
                 "symbol": s.symbol,
                 "wins": 0,
+                "partials": 0,
                 "losses": 0,
                 "expired": 0,
                 "tp1": 0,
@@ -82,10 +84,10 @@ async def get_signal_stats(session: AsyncSession, limit: int = 100) -> dict:
         )
         bucket["total"] += 1
         if s.outcome == "TP1":
-            bucket["wins"] += 1
+            bucket["partials"] += 1
             bucket["tp1"] += 1
         elif s.outcome == "TP2":
-            bucket["wins"] += 1
+            bucket["partials"] += 1
             bucket["tp2"] += 1
         elif s.outcome == "TP3":
             bucket["wins"] += 1
@@ -107,6 +109,7 @@ async def get_signal_stats(session: AsyncSession, limit: int = 100) -> dict:
         "open": sum(1 for s in signals if s.outcome == "OPEN"),
         "closed": len(closed),
         "wins": len(wins),
+        "partials": len(partials),
         "losses": len(losses),
         "expired": len(expired),
         "tp1": sum(1 for s in closed if s.outcome == "TP1"),

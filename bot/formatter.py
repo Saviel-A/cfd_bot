@@ -179,28 +179,28 @@ def format_stats_message(stats: dict) -> str:
         return "📊 <b>Stats</b>\n\nNo signals yet. Run the bot, collect outcomes, then check back."
 
     closed = stats["closed"]
-    win_rate = (stats["wins"] / closed * 100) if closed else 0
-    tp_wins = stats["tp1"] + stats["tp2"] + stats["tp3"]
+    final_closed = stats["wins"] + stats["losses"]
+    win_rate = (stats["wins"] / final_closed * 100) if final_closed else 0
+    partials = stats.get("partials", 0)
 
     lines = [
         "📊 <b>Stats</b>",
         f"Last <b>{stats['total']}</b> signals",
         f"Open: <b>{stats['open']}</b> | Closed: <b>{closed}</b>",
-        f"Win rate: <b>{win_rate:.1f}%</b>",
+        f"Final win rate: <b>{win_rate:.1f}%</b>",
         "",
         "<b>Outcomes</b>",
-        f"✅ Wins: <b>{stats['wins']}</b>  |  🛑 SL: <b>{stats['losses']}</b>  |  ⏸ Expired: <b>{stats['expired']}</b>",
-        f"🎯 TP1: <b>{stats['tp1']}</b>  |  🎯 TP2: <b>{stats['tp2']}</b>  |  🏆 TP3: <b>{stats['tp3']}</b>",
+        f"🏆 TP3 wins: <b>{stats['wins']}</b> | 🛑 SL: <b>{stats['losses']}</b> | ⏸ Expired: <b>{stats['expired']}</b>",
     ]
 
-    if tp_wins:
-        lines.append(f"Best outcome: <b>{_best_tp(stats)}</b>")
+    if partials:
+        lines.append(f"Partial hits before scoring change: <b>{partials}</b>")
 
     if stats["best_symbols"]:
         lines.extend(["", "<b>By Symbol</b>"])
         for s in stats["best_symbols"]:
             lines.append(
-                f"{s['symbol']}: {s['wins']}W {s['losses']}L | TP {s['tp1']}/{s['tp2']}/{s['tp3']}"
+                f"{s['symbol']}: {s['wins']} final wins | {s['losses']} SL | {s.get('partials', 0)} partial"
             )
 
     recent_closed = stats.get("recent_closed") or []
@@ -212,16 +212,10 @@ def format_stats_message(stats: dict) -> str:
     return "\n".join(lines)
 
 
-def _best_tp(stats: dict) -> str:
-    outcomes = [("TP3", stats["tp3"]), ("TP2", stats["tp2"]), ("TP1", stats["tp1"])]
-    best, count = max(outcomes, key=lambda item: item[1])
-    return f"{best} ({count})"
-
-
 def _format_result_line(signal) -> str:
     label = {
-        "TP1": "✅ TP1",
-        "TP2": "✅ TP2",
+        "TP1": "🎯 Partial TP1",
+        "TP2": "🎯 Partial TP2",
         "TP3": "🏆 TP3",
         "SL": "🛑 SL",
         "EXPIRED": "⏸ Expired",
@@ -239,8 +233,8 @@ def format_history_message(signals: list, limit: int = 20) -> str:
 
     outcome_label = {
         "OPEN":      "⏳ Open",
-        "TP1":       "🎯 TP1 hit",
-        "TP2":       "🎯🎯 TP2 hit",
+        "TP1":       "🎯 Partial TP1",
+        "TP2":       "🎯 Partial TP2",
         "TP3":       "🏆 TP3 hit",
         "SL":        "🛑 SL hit",
         "EXPIRED":   "⏸ Expired",
