@@ -46,6 +46,8 @@ def _format_reason(reason: str) -> str:
         "4H bearish trend + 1H bearish confirmation": "4H bearish + 1H confirms",
         "4H bullish + full 1H bearish override": "Strong reversal — all indicators bearish",
         "4H bearish + full 1H bullish override": "Strong reversal — all indicators bullish",
+        "1H bearish + seller momentum": "1H bearish + seller momentum",
+        "1H bullish + buyer momentum": "1H bullish + buyer momentum",
         "Not enough aligned confirmation": "Not enough confirmation",
         "4H trend is neutral": "4H trend is neutral",
     }

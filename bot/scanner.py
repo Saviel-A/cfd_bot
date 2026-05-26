@@ -23,6 +23,7 @@ from src.chart import generate_chart
 from src.calendar import check_news_risk
 from src.trading_hours import _is_open, symbol_market_status
 from src.signal_profiles import signal_profile, stale_candle_reason
+from src.gold_strategy import apply_gold_momentum
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +72,7 @@ async def scan_symbol(symbol: str) -> dict | None:
             signal.direction = "HOLD"
             signal.reason = stale_reason
         pressure = analyze_market_pressure(df)
+        apply_gold_momentum(symbol, signal, pressure)
 
         if signal.direction in ("BUY", "SELL") and should_block_by_pressure(symbol, signal, pressure):
             signal.reason = f"{signal.direction} blocked: {pressure.reason}"
