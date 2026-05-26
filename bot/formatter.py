@@ -232,10 +232,10 @@ def _format_result_line(signal) -> str:
     return f"{arrow} {signal.symbol} {signal.direction}: <b>{label}</b>"
 
 
-# Signal history
+# Recent alerts
 def format_history_message(signals: list, limit: int = 20) -> str:
     if not signals:
-        return "📋 <b>Signal History</b>\n\nNo signals fired yet."
+        return "📋 <b>Recent Alerts</b>\n\nNo alerts sent yet."
 
     outcome_label = {
         "OPEN":      "⏳ Open",
@@ -247,7 +247,7 @@ def format_history_message(signals: list, limit: int = 20) -> str:
         "SUPERSEDED": "🔁 Replaced",
     }
 
-    lines = [f"📋 <b>Signal History</b>", f"Showing: <b>{len(signals)}</b>"]
+    lines = [f"📋 <b>Recent Alerts</b>", f"Showing: <b>{len(signals)}</b>"]
     for s in signals:
         dot     = "📈" if s.direction == "BUY" else "📉"
         outcome = outcome_label.get(s.outcome, s.outcome)

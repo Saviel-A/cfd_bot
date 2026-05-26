@@ -68,13 +68,13 @@ The bot sends a startup message to the owner on launch.
 
 | Command | Description |
 |---|---|
-| `/start` | Owner Console |
-| `/help` | Owner Console |
+| `/start` | Open Menu |
+| `/help` | Show Commands |
 | `/signal XAUUSD` | Check Signal |
 | `/scan` | Scan Channel |
 | `/chart XAUUSD` | Chart |
 | `/stats` | Stats |
-| `/history` | History |
+| `/history` | Recent Alerts |
 | `/watchlist` | Watchlist |
 | `/symbols` | Instruments |
 | `/add XAUUSD` | Add Symbol |

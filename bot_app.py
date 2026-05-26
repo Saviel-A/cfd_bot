@@ -54,13 +54,13 @@ async def main():
         BotCommand(command="start", description="Subscribe"),
     ]
     owner_commands = [
-        BotCommand(command="start", description="Owner Console"),
-        BotCommand(command="help", description="Owner Console"),
+        BotCommand(command="start", description="Open Menu"),
+        BotCommand(command="help", description="Show Commands"),
         BotCommand(command="signal", description="Check Signal"),
         BotCommand(command="scan", description="Scan Channel"),
         BotCommand(command="chart", description="Chart"),
         BotCommand(command="stats", description="Stats"),
-        BotCommand(command="history", description="History"),
+        BotCommand(command="history", description="Recent Alerts"),
         BotCommand(command="watchlist", description="Watchlist"),
         BotCommand(command="symbols", description="Instruments"),
         BotCommand(command="add", description="Add Symbol"),

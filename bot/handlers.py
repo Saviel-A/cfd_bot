@@ -65,7 +65,7 @@ def _menu_markup_main():
     builder.button(text="📡 Scan Channel", callback_data="home:scan")
     builder.button(text="📉 Chart",         callback_data="home:chart")
     builder.button(text="📊 Stats",         callback_data="home:stats")
-    builder.button(text="📜 History",      callback_data="home:history")
+    builder.button(text="📜 Recent Alerts", callback_data="home:history")
     builder.button(text="📋 Watchlist",    callback_data="home:watchlist")
     builder.button(text="🔎 Instruments",  callback_data="home:symbols")
     builder.button(text="➕ Add Symbol",   callback_data="home:symbols")
@@ -137,7 +137,7 @@ def set_bot_username(username: str):
 
 def _commands_text(name: str) -> str:
     return (
-        f"🤖 <b>CFD Signal Bot Owner Console</b>\n\n"
+        f"🤖 <b>CFD Signal Bot Menu</b>\n\n"
         f"Welcome, <b>{name}</b>.\n\n"
         "🔔 <b>Signals</b>\n"
         "/signal XAUUSD - Check Signal\n"
@@ -145,7 +145,7 @@ def _commands_text(name: str) -> str:
         "/chart XAUUSD - Chart\n\n"
         "📊 <b>Stats</b>\n"
         "/stats - Stats\n"
-        "/history - History\n\n"
+        "/history - Recent Alerts\n\n"
         "📋 <b>Watchlist</b>\n"
         "/watchlist - Watchlist\n"
         "/symbols - Instruments\n"
@@ -378,7 +378,7 @@ async def cb_home(callback: CallbackQuery):
             get_hours_message(), parse_mode="HTML", reply_markup=builder.as_markup(),
         )
 
-    # History
+    # Recent Alerts
     elif action == "history":
         parts  = callback.data.split(":")
         sub    = parts[2] if len(parts) > 2 else ""
@@ -387,7 +387,7 @@ async def cb_home(callback: CallbackQuery):
             async with AsyncSessionLocal() as session:
                 count = await clear_all_signals(session)
             await callback.message.edit_text(
-                f"🗑 <b>History Cleared</b>\n\nDeleted signals: <b>{count}</b>",
+                f"🗑 <b>Recent Alerts Cleared</b>\n\nDeleted alerts: <b>{count}</b>",
                 parse_mode="HTML",
                 reply_markup=InlineKeyboardBuilder().button(text="🏠 Home", callback_data="home:menu").as_markup(),
             )
@@ -400,7 +400,7 @@ async def cb_home(callback: CallbackQuery):
                 builder.button(text="Show 50",  callback_data="home:history:50")
             if limit <= 50:
                 builder.button(text="Show 100", callback_data="home:history:100")
-            builder.button(text="🗑 Clear History", callback_data="home:history:clear")
+            builder.button(text="🗑 Clear Alerts", callback_data="home:history:clear")
             builder.button(text="🏠 Home",          callback_data="home:menu")
             builder.adjust(2)
             await callback.message.edit_text(
@@ -412,7 +412,7 @@ async def cb_home(callback: CallbackQuery):
         async with AsyncSessionLocal() as session:
             stats = await get_signal_stats(session, limit=100)
         builder = InlineKeyboardBuilder()
-        builder.button(text="📜 History", callback_data="home:history")
+        builder.button(text="📜 Recent Alerts", callback_data="home:history")
         builder.button(text="🏠 Home", callback_data="home:menu")
         builder.adjust(2)
         await callback.message.edit_text(
@@ -1072,7 +1072,7 @@ async def cmd_hours(message: Message):
     await message.answer(get_hours_message(), parse_mode="HTML", reply_markup=_menu_markup())
 
 
-# /history
+# /history - Recent Alerts
 @router.message(Command("history"))
 async def cmd_history(message: Message):
     if not await _check_owner(message): return
@@ -1086,7 +1086,7 @@ async def cmd_history(message: Message):
         builder.button(text="Show 50",  callback_data="home:history:50")
     if limit <= 50:
         builder.button(text="Show 100", callback_data="home:history:100")
-    builder.button(text="🗑 Clear History", callback_data="home:history:clear")
+    builder.button(text="🗑 Clear Alerts", callback_data="home:history:clear")
     builder.button(text="🏠 Home",          callback_data="home:menu")
     builder.adjust(2)
     await message.answer(format_history_message(signals, limit=limit), parse_mode="HTML", reply_markup=builder.as_markup())
@@ -1098,7 +1098,7 @@ async def cmd_stats(message: Message):
     async with AsyncSessionLocal() as session:
         stats = await get_signal_stats(session, limit=100)
     builder = InlineKeyboardBuilder()
-    builder.button(text="📜 History", callback_data="home:history")
+    builder.button(text="📜 Recent Alerts", callback_data="home:history")
     builder.button(text="🏠 Home", callback_data="home:menu")
     builder.adjust(2)
     await message.answer(format_stats_message(stats), parse_mode="HTML", reply_markup=builder.as_markup())
