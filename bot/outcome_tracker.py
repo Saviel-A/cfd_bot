@@ -52,9 +52,9 @@ def _outcome_message(signal: Signal, outcome: str, price: float) -> str:
     return (
         f"{dot} <b>{signal.symbol} {label}</b>\n\n"
         f"{header}\n\n"
-        f"Entry: {entry}\n"
-        f"🛑 SL: {sl}\n"
-        f"🎯 TP: {tp}\n\n"
+        f"🎯 Entry: <b>{entry}</b>\n"
+        f"🛑 SL: <b>{sl}</b>\n"
+        f"✅ TP: <b>{tp}</b>\n\n"
         f"{action}"
     )
 
