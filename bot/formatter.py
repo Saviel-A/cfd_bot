@@ -101,9 +101,9 @@ def format_signal_message(
     return (
         f"{arrow} <b>{name} {label}</b>\n"
         f"Setup: {reason}\n\n"
-        f"🎯 Entry: {entry}\n"
+        f"📍 Entry: {entry}\n"
         f"🛑 SL: {sl}\n"
-        f"✅ TP: {tp}\n\n"
+        f"🎯 TP: {tp}\n\n"
         f"{news} | {pressure}"
     )
 
@@ -240,9 +240,9 @@ def format_history_message(signals: list, limit: int = 20) -> str:
             date = str(s.fired_at)[:16]
         lines.append(
             f"\n{dot} <b>{s.symbol} {s.direction}</b> | {outcome}\n"
-            f"🎯 Entry: <b>{_fmt_alert(float(s.entry_price))}</b>\n"
+            f"📍 Entry: <b>{_fmt_alert(float(s.entry_price))}</b>\n"
             f"🛑 SL: <b>{_fmt_alert(float(s.stop_loss))}</b> | "
-            f"✅ TP: <b>{_fmt_alert(float(s.tp))}</b>\n"
+            f"🎯 TP: <b>{_fmt_alert(float(s.tp))}</b>\n"
             f"Time: {date}"
         )
 
