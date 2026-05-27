@@ -210,6 +210,8 @@ def format_stats_message(stats: dict) -> str:
 
 def _format_result_line(signal) -> str:
     label = {
+        "TP1_OPEN": "🎯 TP1 hit",
+        "TP2_OPEN": "🎯 TP2 hit",
         "TP3": "🏆 TP3",
         "SL": "🛑 SL",
         "OPEN": "⏳ Open",
@@ -225,6 +227,8 @@ def format_history_message(signals: list, limit: int = 20) -> str:
 
     outcome_label = {
         "OPEN":      "⏳ Open",
+        "TP1_OPEN":  "🎯 TP1 hit",
+        "TP2_OPEN":  "🎯 TP2 hit",
         "TP3":       "🏆 TP3 hit",
         "SL":        "🛑 SL hit",
     }

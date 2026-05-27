@@ -21,13 +21,22 @@ CHECK_INTERVAL_MINUTES = 15
 
 def _check_outcome(signal: Signal, price: float) -> str | None:
     sl  = float(signal.stop_loss)
+    tp1 = float(signal.tp1)
+    tp2 = float(signal.tp2)
     tp3 = float(signal.tp3)
+    stage = signal.outcome or "OPEN"
 
     if signal.direction == "BUY":
         if price >= tp3: return "TP3"
+        if stage == "OPEN" and price >= tp2: return "TP2_OPEN"
+        if stage == "OPEN" and price >= tp1: return "TP1_OPEN"
+        if stage == "TP1_OPEN" and price >= tp2: return "TP2_OPEN"
         if price <= sl:  return "SL"
     else:
         if price <= tp3: return "TP3"
+        if stage == "OPEN" and price <= tp2: return "TP2_OPEN"
+        if stage == "OPEN" and price <= tp1: return "TP1_OPEN"
+        if stage == "TP1_OPEN" and price <= tp2: return "TP2_OPEN"
         if price >= sl:  return "SL"
     return None
 
@@ -45,6 +54,12 @@ def _outcome_message(signal: Signal, outcome: str, price: float) -> str:
     if outcome == "TP3":
         header = "🏆 <b>TP3 Hit</b>"
         action = "Close the trade. Full target reached."
+    elif outcome == "TP2_OPEN":
+        header = "🎯 <b>TP2 Hit</b>"
+        action = "Partial target reached. Trade is still being tracked for TP3 or SL."
+    elif outcome == "TP1_OPEN":
+        header = "🎯 <b>TP1 Hit</b>"
+        action = "First target reached. Trade is still being tracked for TP2, TP3 or SL."
     elif outcome == "SL":
         header = "🛑 <b>Stop Loss Hit</b>"
         action = "Trade closed. Wait for the next signal."

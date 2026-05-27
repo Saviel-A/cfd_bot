@@ -1,8 +1,10 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, delete
 from bot.db.models.signal import Signal
+from datetime import datetime, timezone
 
 NON_TRADE_OUTCOMES = ("SUPERSEDED", "SKIPPED", "REPLACED", "EXPIRED", "TP1", "TP2")
+ACTIVE_OUTCOMES = ("OPEN", "TP1_OPEN", "TP2_OPEN")
 FINAL_OUTCOMES = ("TP3", "SL")
 
 
@@ -11,7 +13,7 @@ async def save_signal(session: AsyncSession, data: dict) -> Signal:
     # instead of creating a visible "replaced" result.
     await session.execute(
         delete(Signal)
-        .where(Signal.symbol == data["symbol"], Signal.outcome == "OPEN")
+        .where(Signal.symbol == data["symbol"], Signal.outcome.in_(ACTIVE_OUTCOMES))
     )
     signal = Signal(**data)
     session.add(signal)
@@ -32,7 +34,7 @@ async def get_last_signal_for_symbol(session: AsyncSession, symbol: str) -> Sign
 
 async def get_open_signals(session: AsyncSession) -> list[Signal]:
     result = await session.execute(
-        select(Signal).where(Signal.outcome == "OPEN")
+        select(Signal).where(Signal.outcome.in_(ACTIVE_OUTCOMES))
     )
     return result.scalars().all()
 
@@ -96,7 +98,7 @@ async def get_signal_stats(session: AsyncSession, limit: int = 100) -> dict:
     return {
         "limit": limit,
         "total": len(closed),
-        "open": sum(1 for s in signals if s.outcome == "OPEN"),
+        "open": sum(1 for s in signals if s.outcome in ACTIVE_OUTCOMES),
         "closed": len(closed),
         "wins": len(wins),
         "losses": len(losses),
