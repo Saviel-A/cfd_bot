@@ -92,7 +92,7 @@ def format_signal_message(
     entry_price = live_price if live_price else signal.current_price
     entry = f"<code>{_fmt_alert(entry_price)}</code>"
     sl    = f"<code>{_fmt_alert(trade.stop_loss)}</code>" if trade else "N/A"
-    tp    = f"<code>{_fmt_alert(trade.tp1)}</code>"       if trade else "N/A"
+    tp    = f"<code>{_fmt_alert(trade.tp)}</code>"        if trade else "N/A"
 
     news = _news_line(news_risk, news_events)
     pressure = _pressure_line(market_pressure)
@@ -207,7 +207,6 @@ def format_stats_message(stats: dict) -> str:
 def _format_result_line(signal) -> str:
     label = {
         "TP": "🎯 TP",
-        "TP3": "🎯 TP",
         "SL": "🛑 SL",
         "OPEN": "⏳ Open",
     }.get(signal.outcome, signal.outcome)
@@ -223,7 +222,6 @@ def format_history_message(signals: list, limit: int = 20) -> str:
     outcome_label = {
         "OPEN":      "⏳ Open",
         "TP":        "🎯 TP hit",
-        "TP3":       "🎯 TP hit",
         "SL":        "🛑 SL hit",
     }
 
@@ -244,7 +242,7 @@ def format_history_message(signals: list, limit: int = 20) -> str:
             f"\n{dot} <b>{s.symbol} {s.direction}</b> | {outcome}\n"
             f"Entry: <code>{_fmt_alert(float(s.entry_price))}</code>\n"
             f"SL: <code>{_fmt_alert(float(s.stop_loss))}</code> | "
-            f"TP: <code>{_fmt_alert(float(s.tp1))}</code>\n"
+            f"TP: <code>{_fmt_alert(float(s.tp))}</code>\n"
             f"Time: {date}"
         )
 

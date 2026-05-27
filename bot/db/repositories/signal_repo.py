@@ -3,9 +3,9 @@ from sqlalchemy import select, update, delete
 from bot.db.models.signal import Signal
 from datetime import datetime, timezone
 
-NON_TRADE_OUTCOMES = ("SUPERSEDED", "SKIPPED", "REPLACED", "EXPIRED", "TP1", "TP2", "TP1_OPEN", "TP2_OPEN")
+NON_TRADE_OUTCOMES = ("SUPERSEDED", "SKIPPED", "REPLACED", "EXPIRED")
 ACTIVE_OUTCOMES = ("OPEN",)
-FINAL_OUTCOMES = ("TP", "TP3", "SL")
+FINAL_OUTCOMES = ("TP", "SL")
 
 
 async def save_signal(session: AsyncSession, data: dict) -> Signal:
@@ -67,7 +67,7 @@ async def get_signal_stats(session: AsyncSession, limit: int = 100) -> dict:
     )
     signals = result.scalars().all()
     closed = [s for s in signals if s.outcome in FINAL_OUTCOMES]
-    wins = [s for s in closed if s.outcome in ("TP", "TP3")]
+    wins = [s for s in closed if s.outcome == "TP"]
     losses = [s for s in closed if s.outcome == "SL"]
 
     by_symbol: dict[str, dict] = {}
@@ -83,7 +83,7 @@ async def get_signal_stats(session: AsyncSession, limit: int = 100) -> dict:
             },
         )
         bucket["total"] += 1
-        if s.outcome in ("TP", "TP3"):
+        if s.outcome == "TP":
             bucket["wins"] += 1
             bucket["tp"] += 1
         elif s.outcome == "SL":

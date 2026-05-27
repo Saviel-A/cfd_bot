@@ -28,8 +28,6 @@ class Config:
     SL_MIN: float            = 7.0   # pips
     SL_MAX: float            = 10.0  # pips
     RR1: float               = float(os.getenv("RR1", "1.5"))
-    RR2: float               = float(os.getenv("RR2", "2.0"))
-    RR3: float               = float(os.getenv("RR3", "3.0"))
     ACCOUNT_BALANCE: float   = 10000
     RISK_PERCENT: float      = 1.5
 
@@ -51,14 +49,10 @@ RISK_CFG = {
     "sl_min":            cfg.SL_MIN,
     "sl_max":            cfg.SL_MAX,
     "rr1":               cfg.RR1,
-    "rr2":               cfg.RR2,
-    "rr3":               cfg.RR3,
 }
 
 # Counter-trend signals: tighter TP, same risk — quick in, quick out
 COUNTER_TREND_RISK_CFG = {
     **RISK_CFG,
     "rr1": 1.0,
-    "rr2": 1.5,
-    "rr3": 2.0,
 }

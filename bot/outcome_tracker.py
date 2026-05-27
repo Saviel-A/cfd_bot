@@ -21,7 +21,7 @@ CHECK_INTERVAL_MINUTES = 15
 
 def _check_outcome(signal: Signal, price: float) -> str | None:
     sl  = float(signal.stop_loss)
-    tp  = float(signal.tp1)
+    tp  = float(signal.tp)
 
     if signal.direction == "BUY":
         if price >= tp: return "TP"
@@ -37,7 +37,7 @@ def _outcome_message(signal: Signal, outcome: str, price: float) -> str:
     label = "BUY" if signal.direction == "BUY" else "SELL"
     entry = _fmt(float(signal.entry_price))
     sl    = _fmt(float(signal.stop_loss))
-    tp    = _fmt(float(signal.tp1))
+    tp    = _fmt(float(signal.tp))
     now   = _fmt(price)
 
     if outcome == "TP":
