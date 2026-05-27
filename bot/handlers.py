@@ -230,7 +230,7 @@ async def cmd_start(message: Message):
         "📡 <b>CFD Smart Signals</b>\n"
         "Private alerts for Forex, Gold and Indices.\n\n"
         "Each alert includes:\n"
-        "Entry | SL | TP1 | TP2 | TP3\n"
+        "Entry | SL | TP\n"
         "7-10 pip SL cap\n"
         "1H setup + 4H trend check\n\n"
         "Subscribe to get channel access.",
@@ -1335,7 +1335,7 @@ async def cb_sub_plans(callback: CallbackQuery):
     await callback.message.edit_text(
         "⭐️ <b>CFD Smart Signals</b>\n\n"
         "Private CFD signal channel.\n"
-        "Signals include Entry, SL, TP1, TP2 and TP3.\n\n"
+        "Signals include Entry, SL and TP.\n\n"
         "1 Month: <b>$99</b>\n"
         "3 Months: <b>$199</b>\n"
         "Lifetime: <b>$299</b>\n\n"
@@ -1356,7 +1356,7 @@ async def cb_buy_plan(callback: CallbackQuery):
     await callback.bot.send_invoice(
         chat_id=callback.from_user.id,
         title=f"CFD Smart Signals {plan['label']}",
-        description="Live CFD trading signals with Entry, Stop Loss and 3 Take Profit levels, delivered to a private VIP channel.",
+        description="Live CFD trading signals with Entry, Stop Loss and Take Profit, delivered to a private VIP channel.",
         payload=f"plan:{plan_id}",
         currency="XTR",
         prices=[LabeledPrice(label=plan["label"], amount=plan["stars"])],
@@ -1494,7 +1494,7 @@ async def handle_join_request(request: ChatJoinRequest):
                 user_id,
                 f"👋 <b>Hi {name}</b>\n\n"
                 "This is a private signals channel.\n\n"
-                "Subscribe to get access to alerts with Entry, SL, TP1, TP2 and TP3.",
+                "Subscribe to get access to alerts with Entry, SL and TP.",
                 parse_mode="HTML",
                 reply_markup=builder.as_markup(),
             )
@@ -1528,7 +1528,7 @@ async def catch_all_user(message: Message):
         f"👋 <b>Welcome, {name}</b>\n\n"
         "📡 <b>CFD Smart Signals</b>\n"
         "Private alerts for Forex, Gold and Indices.\n\n"
-        "Each alert includes Entry, SL, TP1, TP2 and TP3.\n"
+        "Each alert includes Entry, SL and TP.\n"
         "Subscribe to get channel access.",
         parse_mode="HTML",
         reply_markup=builder.as_markup(),

@@ -92,9 +92,7 @@ def format_signal_message(
     entry_price = live_price if live_price else signal.current_price
     entry = f"<code>{_fmt_alert(entry_price)}</code>"
     sl    = f"<code>{_fmt_alert(trade.stop_loss)}</code>" if trade else "N/A"
-    tp1   = f"<code>{_fmt_alert(trade.tp1)}</code>"       if trade else "N/A"
-    tp2   = f"<code>{_fmt_alert(trade.tp2)}</code>"       if trade else "N/A"
-    tp3   = f"<code>{_fmt_alert(trade.tp3)}</code>"       if trade else "N/A"
+    tp    = f"<code>{_fmt_alert(trade.tp1)}</code>"       if trade else "N/A"
 
     news = _news_line(news_risk, news_events)
     pressure = _pressure_line(market_pressure)
@@ -105,9 +103,7 @@ def format_signal_message(
         f"Setup: {reason}\n\n"
         f"Entry: {entry}\n"
         f"SL: {sl}\n"
-        f"TP1: {tp1}\n"
-        f"TP2: {tp2}\n"
-        f"TP3: {tp3}\n\n"
+        f"TP: {tp}\n\n"
         f"{news} | {pressure}"
     )
 
@@ -189,7 +185,7 @@ def format_stats_message(stats: dict) -> str:
         f"Final win rate: <b>{win_rate:.1f}%</b>",
         "",
         "<b>Outcomes</b>",
-        f"🏆 TP3 wins: <b>{stats['wins']}</b> | 🛑 SL: <b>{stats['losses']}</b>",
+        f"🎯 TP wins: <b>{stats['wins']}</b> | 🛑 SL: <b>{stats['losses']}</b>",
     ]
 
     if stats["best_symbols"]:
@@ -210,9 +206,8 @@ def format_stats_message(stats: dict) -> str:
 
 def _format_result_line(signal) -> str:
     label = {
-        "TP1_OPEN": "🎯 TP1 hit",
-        "TP2_OPEN": "🎯 TP2 hit",
-        "TP3": "🏆 TP3",
+        "TP": "🎯 TP",
+        "TP3": "🎯 TP",
         "SL": "🛑 SL",
         "OPEN": "⏳ Open",
     }.get(signal.outcome, signal.outcome)
@@ -227,9 +222,8 @@ def format_history_message(signals: list, limit: int = 20) -> str:
 
     outcome_label = {
         "OPEN":      "⏳ Open",
-        "TP1_OPEN":  "🎯 TP1 hit",
-        "TP2_OPEN":  "🎯 TP2 hit",
-        "TP3":       "🏆 TP3 hit",
+        "TP":        "🎯 TP hit",
+        "TP3":       "🎯 TP hit",
         "SL":        "🛑 SL hit",
     }
 
@@ -250,7 +244,7 @@ def format_history_message(signals: list, limit: int = 20) -> str:
             f"\n{dot} <b>{s.symbol} {s.direction}</b> | {outcome}\n"
             f"Entry: <code>{_fmt_alert(float(s.entry_price))}</code>\n"
             f"SL: <code>{_fmt_alert(float(s.stop_loss))}</code> | "
-            f"TP: <code>{_fmt_alert(float(s.tp1))}</code> / <code>{_fmt_alert(float(s.tp2))}</code> / <code>{_fmt_alert(float(s.tp3))}</code>\n"
+            f"TP: <code>{_fmt_alert(float(s.tp1))}</code>\n"
             f"Time: {date}"
         )
 

@@ -3,9 +3,9 @@ from sqlalchemy import select, update, delete
 from bot.db.models.signal import Signal
 from datetime import datetime, timezone
 
-NON_TRADE_OUTCOMES = ("SUPERSEDED", "SKIPPED", "REPLACED", "EXPIRED", "TP1", "TP2")
-ACTIVE_OUTCOMES = ("OPEN", "TP1_OPEN", "TP2_OPEN")
-FINAL_OUTCOMES = ("TP3", "SL")
+NON_TRADE_OUTCOMES = ("SUPERSEDED", "SKIPPED", "REPLACED", "EXPIRED", "TP1", "TP2", "TP1_OPEN", "TP2_OPEN")
+ACTIVE_OUTCOMES = ("OPEN",)
+FINAL_OUTCOMES = ("TP", "TP3", "SL")
 
 
 async def save_signal(session: AsyncSession, data: dict) -> Signal:
@@ -67,7 +67,7 @@ async def get_signal_stats(session: AsyncSession, limit: int = 100) -> dict:
     )
     signals = result.scalars().all()
     closed = [s for s in signals if s.outcome in FINAL_OUTCOMES]
-    wins = [s for s in closed if s.outcome == "TP3"]
+    wins = [s for s in closed if s.outcome in ("TP", "TP3")]
     losses = [s for s in closed if s.outcome == "SL"]
 
     by_symbol: dict[str, dict] = {}
@@ -78,14 +78,14 @@ async def get_signal_stats(session: AsyncSession, limit: int = 100) -> dict:
                 "symbol": s.symbol,
                 "wins": 0,
                 "losses": 0,
-                "tp3": 0,
+                "tp": 0,
                 "total": 0,
             },
         )
         bucket["total"] += 1
-        if s.outcome == "TP3":
+        if s.outcome in ("TP", "TP3"):
             bucket["wins"] += 1
-            bucket["tp3"] += 1
+            bucket["tp"] += 1
         elif s.outcome == "SL":
             bucket["losses"] += 1
 
@@ -102,7 +102,7 @@ async def get_signal_stats(session: AsyncSession, limit: int = 100) -> dict:
         "closed": len(closed),
         "wins": len(wins),
         "losses": len(losses),
-        "tp3": sum(1 for s in closed if s.outcome == "TP3"),
+        "tp": len(wins),
         "recent_closed": closed[:8],
         "best_symbols": ranked[:3],
         "worst_symbols": list(reversed(ranked[-3:])) if ranked else [],

@@ -21,22 +21,13 @@ CHECK_INTERVAL_MINUTES = 15
 
 def _check_outcome(signal: Signal, price: float) -> str | None:
     sl  = float(signal.stop_loss)
-    tp1 = float(signal.tp1)
-    tp2 = float(signal.tp2)
-    tp3 = float(signal.tp3)
-    stage = signal.outcome or "OPEN"
+    tp  = float(signal.tp1)
 
     if signal.direction == "BUY":
-        if price >= tp3: return "TP3"
-        if stage == "OPEN" and price >= tp2: return "TP2_OPEN"
-        if stage == "OPEN" and price >= tp1: return "TP1_OPEN"
-        if stage == "TP1_OPEN" and price >= tp2: return "TP2_OPEN"
+        if price >= tp: return "TP"
         if price <= sl:  return "SL"
     else:
-        if price <= tp3: return "TP3"
-        if stage == "OPEN" and price <= tp2: return "TP2_OPEN"
-        if stage == "OPEN" and price <= tp1: return "TP1_OPEN"
-        if stage == "TP1_OPEN" and price <= tp2: return "TP2_OPEN"
+        if price <= tp: return "TP"
         if price >= sl:  return "SL"
     return None
 
@@ -46,20 +37,12 @@ def _outcome_message(signal: Signal, outcome: str, price: float) -> str:
     label = "BUY" if signal.direction == "BUY" else "SELL"
     entry = _fmt(float(signal.entry_price))
     sl    = _fmt(float(signal.stop_loss))
-    tp1   = _fmt(float(signal.tp1))
-    tp2   = _fmt(float(signal.tp2))
-    tp3   = _fmt(float(signal.tp3))
+    tp    = _fmt(float(signal.tp1))
     now   = _fmt(price)
 
-    if outcome == "TP3":
-        header = "🏆 <b>TP3 Hit</b>"
-        action = "Close the trade. Full target reached."
-    elif outcome == "TP2_OPEN":
-        header = "🎯 <b>TP2 Hit</b>"
-        action = "Partial target reached. Trade is still being tracked for TP3 or SL."
-    elif outcome == "TP1_OPEN":
-        header = "🎯 <b>TP1 Hit</b>"
-        action = "First target reached. Trade is still being tracked for TP2, TP3 or SL."
+    if outcome == "TP":
+        header = "🎯 <b>TP Hit</b>"
+        action = "Trade closed in profit."
     elif outcome == "SL":
         header = "🛑 <b>Stop Loss Hit</b>"
         action = "Trade closed. Wait for the next signal."
@@ -71,9 +54,7 @@ def _outcome_message(signal: Signal, outcome: str, price: float) -> str:
         f"{header}\n\n"
         f"Entry: <code>{entry}</code>\n"
         f"🛑 SL: <code>{sl}</code>\n"
-        f"🎯 TP1: <code>{tp1}</code>\n"
-        f"🎯 TP2: <code>{tp2}</code>\n"
-        f"🏆 TP3: <code>{tp3}</code>\n\n"
+        f"🎯 TP: <code>{tp}</code>\n\n"
         f"{action}"
     )
 

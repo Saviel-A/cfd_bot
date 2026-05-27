@@ -1,10 +1,4 @@
-"""
-Risk Manager — ATR-based SL clamped to a symbol-aware pip range.
-
-TP1 = SL × RR1 (partial close, default 1.5)
-TP2 = SL × RR2 (main target,  default 2.0)
-TP3 = SL × RR3 (runner,       default 3.0)
-"""
+"""Risk Manager — ATR-based SL/TP clamped to a symbol-aware pip range."""
 
 from dataclasses import dataclass
 from typing import Optional
