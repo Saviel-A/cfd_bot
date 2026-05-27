@@ -90,9 +90,9 @@ def format_signal_message(
     label  = "BUY" if is_buy else "SELL"
 
     entry_price = live_price if live_price else signal.current_price
-    entry = f"<code>{_fmt_alert(entry_price)}</code>"
-    sl    = f"<code>{_fmt_alert(trade.stop_loss)}</code>" if trade else "N/A"
-    tp    = f"<code>{_fmt_alert(trade.tp)}</code>"        if trade else "N/A"
+    entry = _fmt_alert(entry_price)
+    sl    = _fmt_alert(trade.stop_loss) if trade else "N/A"
+    tp    = _fmt_alert(trade.tp)        if trade else "N/A"
 
     news = _news_line(news_risk, news_events)
     pressure = _pressure_line(market_pressure)
@@ -147,7 +147,7 @@ def format_watchlist_message(results: list) -> str:
             lines.append(f"⚠️ <b>{name}</b>: unavailable")
             continue
         signal  = r["signal"]
-        price   = f"<code>{_fmt_price(signal.current_price)}</code>" if signal.current_price else "N/A"
+        price   = _fmt_price(signal.current_price) if signal.current_price else "N/A"
         is_open, _ = symbol_market_status(symbol)
         dot = "🟢" if is_open else "🔴"
 
@@ -240,9 +240,9 @@ def format_history_message(signals: list, limit: int = 20) -> str:
             date = str(s.fired_at)[:16]
         lines.append(
             f"\n{dot} <b>{s.symbol} {s.direction}</b> | {outcome}\n"
-            f"Entry: <code>{_fmt_alert(float(s.entry_price))}</code>\n"
-            f"SL: <code>{_fmt_alert(float(s.stop_loss))}</code> | "
-            f"TP: <code>{_fmt_alert(float(s.tp))}</code>\n"
+            f"Entry: {_fmt_alert(float(s.entry_price))}\n"
+            f"SL: {_fmt_alert(float(s.stop_loss))} | "
+            f"TP: {_fmt_alert(float(s.tp))}\n"
             f"Time: {date}"
         )
 
