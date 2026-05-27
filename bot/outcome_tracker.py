@@ -1,13 +1,11 @@
 """
 Outcome Tracker: runs every 15 minutes.
-Checks all OPEN signals, detects if final TP/SL was hit,
+Checks all OPEN signals and detects only final TP/SL outcomes.
 updates the DB, and posts the result to the broadcast channel.
-Signals open for more than 48 hours are marked EXPIRED.
 """
 
 import asyncio
 import logging
-from datetime import datetime, timezone, timedelta
 
 from bot.config import cfg
 from bot.db.session import AsyncSessionLocal
@@ -18,14 +16,11 @@ from bot.formatter import _fmt_alert as _fmt
 
 logger = logging.getLogger(__name__)
 
-EXPIRY_HOURS        = 48
 CHECK_INTERVAL_MINUTES = 15
 
 
 def _check_outcome(signal: Signal, price: float) -> str | None:
     sl  = float(signal.stop_loss)
-    tp1 = float(signal.tp1)
-    tp2 = float(signal.tp2)
     tp3 = float(signal.tp3)
 
     if signal.direction == "BUY":
@@ -54,8 +49,7 @@ def _outcome_message(signal: Signal, outcome: str, price: float) -> str:
         header = "🛑 <b>Stop Loss Hit</b>"
         action = "Trade closed. Wait for the next signal."
     else:
-        header = "⏸ <b>Signal Expired</b>"
-        action = "Close if still open."
+        return ""
 
     return (
         f"{dot} <b>{signal.symbol} {label}</b>\n\n"
@@ -85,13 +79,6 @@ async def run_outcome_tracker(bot, interval_minutes: int = CHECK_INTERVAL_MINUTE
 
             for signal in open_signals:
                 try:
-                    fired = signal.fired_at if signal.fired_at.tzinfo else signal.fired_at.replace(tzinfo=timezone.utc)
-                    if datetime.now(timezone.utc) - fired > timedelta(hours=EXPIRY_HOURS):
-                        async with AsyncSessionLocal() as session:
-                            await update_outcome(session, signal.id, "EXPIRED")
-                        logger.info(f"Signal {signal.id} ({signal.symbol}) expired")
-                        continue
-
                     loop  = asyncio.get_running_loop()
                     price = await loop.run_in_executor(None, lambda s=signal.symbol: get_live_price(s))
 

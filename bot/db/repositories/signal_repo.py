@@ -1,15 +1,17 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, delete
 from bot.db.models.signal import Signal
-from datetime import datetime, timezone
+
+NON_TRADE_OUTCOMES = ("SUPERSEDED", "SKIPPED", "REPLACED", "EXPIRED", "TP1", "TP2")
+FINAL_OUTCOMES = ("TP3", "SL")
 
 
 async def save_signal(session: AsyncSession, data: dict) -> Signal:
-    # Close any existing open signal for this symbol before creating a new one
+    # Keep stats clean: a newer alert removes the previous unclosed alert
+    # instead of creating a visible "replaced" result.
     await session.execute(
-        update(Signal)
+        delete(Signal)
         .where(Signal.symbol == data["symbol"], Signal.outcome == "OPEN")
-        .values(outcome="SUPERSEDED", outcome_at=datetime.now(timezone.utc))
     )
     signal = Signal(**data)
     session.add(signal)
@@ -21,7 +23,7 @@ async def save_signal(session: AsyncSession, data: dict) -> Signal:
 async def get_last_signal_for_symbol(session: AsyncSession, symbol: str) -> Signal | None:
     result = await session.execute(
         select(Signal)
-        .where(Signal.symbol == symbol)
+        .where(Signal.symbol == symbol, Signal.outcome.not_in(NON_TRADE_OUTCOMES))
         .order_by(Signal.fired_at.desc())
         .limit(1)
     )
@@ -47,6 +49,7 @@ async def update_outcome(session: AsyncSession, signal_id: int, outcome: str):
 async def get_recent_signals(session: AsyncSession, limit: int = 20) -> list[Signal]:
     result = await session.execute(
         select(Signal)
+        .where(Signal.outcome.not_in(NON_TRADE_OUTCOMES))
         .order_by(Signal.fired_at.desc())
         .limit(limit)
     )
@@ -56,15 +59,14 @@ async def get_recent_signals(session: AsyncSession, limit: int = 20) -> list[Sig
 async def get_signal_stats(session: AsyncSession, limit: int = 100) -> dict:
     result = await session.execute(
         select(Signal)
+        .where(Signal.outcome.not_in(NON_TRADE_OUTCOMES))
         .order_by(Signal.fired_at.desc())
         .limit(limit)
     )
     signals = result.scalars().all()
-    closed = [s for s in signals if s.outcome not in ("OPEN", "SUPERSEDED")]
+    closed = [s for s in signals if s.outcome in FINAL_OUTCOMES]
     wins = [s for s in closed if s.outcome == "TP3"]
-    partials = [s for s in closed if s.outcome in ("TP1", "TP2")]
     losses = [s for s in closed if s.outcome == "SL"]
-    expired = [s for s in closed if s.outcome == "EXPIRED"]
 
     by_symbol: dict[str, dict] = {}
     for s in closed:
@@ -73,29 +75,17 @@ async def get_signal_stats(session: AsyncSession, limit: int = 100) -> dict:
             {
                 "symbol": s.symbol,
                 "wins": 0,
-                "partials": 0,
                 "losses": 0,
-                "expired": 0,
-                "tp1": 0,
-                "tp2": 0,
                 "tp3": 0,
                 "total": 0,
             },
         )
         bucket["total"] += 1
-        if s.outcome == "TP1":
-            bucket["partials"] += 1
-            bucket["tp1"] += 1
-        elif s.outcome == "TP2":
-            bucket["partials"] += 1
-            bucket["tp2"] += 1
-        elif s.outcome == "TP3":
+        if s.outcome == "TP3":
             bucket["wins"] += 1
             bucket["tp3"] += 1
         elif s.outcome == "SL":
             bucket["losses"] += 1
-        elif s.outcome == "EXPIRED":
-            bucket["expired"] += 1
 
     ranked = sorted(
         by_symbol.values(),
@@ -105,15 +95,11 @@ async def get_signal_stats(session: AsyncSession, limit: int = 100) -> dict:
 
     return {
         "limit": limit,
-        "total": len(signals),
+        "total": len(closed),
         "open": sum(1 for s in signals if s.outcome == "OPEN"),
         "closed": len(closed),
         "wins": len(wins),
-        "partials": len(partials),
         "losses": len(losses),
-        "expired": len(expired),
-        "tp1": sum(1 for s in closed if s.outcome == "TP1"),
-        "tp2": sum(1 for s in closed if s.outcome == "TP2"),
         "tp3": sum(1 for s in closed if s.outcome == "TP3"),
         "recent_closed": closed[:8],
         "best_symbols": ranked[:3],
@@ -123,5 +109,13 @@ async def get_signal_stats(session: AsyncSession, limit: int = 100) -> dict:
 
 async def clear_all_signals(session: AsyncSession) -> int:
     result = await session.execute(delete(Signal))
+    await session.commit()
+    return result.rowcount
+
+
+async def delete_non_trade_signals(session: AsyncSession) -> int:
+    result = await session.execute(
+        delete(Signal).where(Signal.outcome.in_(NON_TRADE_OUTCOMES))
+    )
     await session.commit()
     return result.rowcount

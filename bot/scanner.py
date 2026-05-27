@@ -194,15 +194,25 @@ async def _broadcast_signal(bot, symbol: str, result: dict):
 
 
 async def _duplicate_suppression_reason(symbol: str, direction: str) -> str | None:
-    """Return a reason when a same-direction signal is still inside cooldown."""
+    """Return a reason when a recent signal should suppress auto broadcast."""
     async with AsyncSessionLocal() as session:
         last = await get_last_signal_for_symbol(session, symbol)
-        if not last or last.direction != direction:
+        if not last:
             return None
 
         fired = last.fired_at if last.fired_at.tzinfo else last.fired_at.replace(tzinfo=timezone.utc)
+        elapsed = datetime.now(timezone.utc) - fired
+
+        if last.direction != direction:
+            reversal_cooldown = timedelta(minutes=60)
+            remaining = reversal_cooldown - elapsed
+            if remaining > timedelta(0):
+                minutes = max(1, int(remaining.total_seconds() // 60))
+                return f"{direction} blocked: last alert was {last.direction}. Wait {minutes}m before flipping direction"
+            return None
+
         cooldown = timedelta(minutes=signal_profile(symbol)["duplicate_cooldown_minutes"])
-        remaining = cooldown - (datetime.now(timezone.utc) - fired)
+        remaining = cooldown - elapsed
         if remaining <= timedelta(0):
             return None
 
@@ -230,6 +240,10 @@ async def _prepare_live_trade(symbol: str, result: dict) -> tuple[float | None, 
 
 
 async def _save_sent_signal(symbol: str, result: dict, live_price, trade):
+    if trade is None:
+        logger.info(f"{symbol}: sent alert was not saved because trade levels are unavailable")
+        return
+
     signal = result["signal"]
     entry_for_db = live_price if live_price else signal.current_price
     async with AsyncSessionLocal() as session:
@@ -238,12 +252,12 @@ async def _save_sent_signal(symbol: str, result: dict, live_price, trade):
             "direction":        signal.direction,
             "timeframe":        signal_profile(symbol)["entry_timeframe"],
             "entry_price":      entry_for_db,
-            "stop_loss":        trade.stop_loss if trade else entry_for_db,
-            "tp1":              trade.tp1 if trade else entry_for_db,
-            "tp2":              trade.tp2 if trade else entry_for_db,
-            "tp3":              trade.tp3 if trade else entry_for_db,
-            "sl_distance":      trade.sl_distance if trade else None,
-            "atr":              trade.atr if trade else None,
+            "stop_loss":        trade.stop_loss,
+            "tp1":              trade.tp1,
+            "tp2":              trade.tp2,
+            "tp3":              trade.tp3,
+            "sl_distance":      trade.sl_distance,
+            "atr":              trade.atr,
             "confluence_score": signal.strength,
             "confluence_total": signal.total_indicators,
             "indicator_votes":  signal.details,

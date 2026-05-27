@@ -176,31 +176,27 @@ def format_watchlist_message(results: list) -> str:
 
 def format_stats_message(stats: dict) -> str:
     if not stats["total"]:
-        return "📊 <b>Stats</b>\n\nNo signals yet. Run the bot, collect outcomes, then check back."
+        return "📊 <b>Stats</b>\n\nNo final results yet."
 
     closed = stats["closed"]
     final_closed = stats["wins"] + stats["losses"]
     win_rate = (stats["wins"] / final_closed * 100) if final_closed else 0
-    partials = stats.get("partials", 0)
 
     lines = [
         "📊 <b>Stats</b>",
-        f"Last <b>{stats['total']}</b> signals",
-        f"Open: <b>{stats['open']}</b> | Closed: <b>{closed}</b>",
+        f"Final results: <b>{closed}</b>",
+        f"Tracking open alerts: <b>{stats['open']}</b>",
         f"Final win rate: <b>{win_rate:.1f}%</b>",
         "",
         "<b>Outcomes</b>",
-        f"🏆 TP3 wins: <b>{stats['wins']}</b> | 🛑 SL: <b>{stats['losses']}</b> | ⏸ Expired: <b>{stats['expired']}</b>",
+        f"🏆 TP3 wins: <b>{stats['wins']}</b> | 🛑 SL: <b>{stats['losses']}</b>",
     ]
-
-    if partials:
-        lines.append(f"Partial hits before scoring change: <b>{partials}</b>")
 
     if stats["best_symbols"]:
         lines.extend(["", "<b>By Symbol</b>"])
         for s in stats["best_symbols"]:
             lines.append(
-                f"{s['symbol']}: {s['wins']} final wins | {s['losses']} SL | {s.get('partials', 0)} partial"
+                f"{s['symbol']}: {s['wins']} wins | {s['losses']} SL"
             )
 
     recent_closed = stats.get("recent_closed") or []
@@ -214,12 +210,8 @@ def format_stats_message(stats: dict) -> str:
 
 def _format_result_line(signal) -> str:
     label = {
-        "TP1": "🎯 Partial TP1",
-        "TP2": "🎯 Partial TP2",
         "TP3": "🏆 TP3",
         "SL": "🛑 SL",
-        "EXPIRED": "⏸ Expired",
-        "SUPERSEDED": "🔁 Replaced",
         "OPEN": "⏳ Open",
     }.get(signal.outcome, signal.outcome)
     arrow = "📈" if signal.direction == "BUY" else "📉"
@@ -233,12 +225,8 @@ def format_history_message(signals: list, limit: int = 20) -> str:
 
     outcome_label = {
         "OPEN":      "⏳ Open",
-        "TP1":       "🎯 Partial TP1",
-        "TP2":       "🎯 Partial TP2",
         "TP3":       "🏆 TP3 hit",
         "SL":        "🛑 SL hit",
-        "EXPIRED":   "⏸ Expired",
-        "SUPERSEDED": "🔁 Replaced",
     }
 
     lines = [f"📋 <b>Recent Alerts</b>", f"Showing: <b>{len(signals)}</b>"]
