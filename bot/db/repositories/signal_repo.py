@@ -32,6 +32,16 @@ async def get_last_signal_for_symbol(session: AsyncSession, symbol: str) -> Sign
     return result.scalar_one_or_none()
 
 
+async def get_active_signal_for_symbol(session: AsyncSession, symbol: str) -> Signal | None:
+    result = await session.execute(
+        select(Signal)
+        .where(Signal.symbol == symbol, Signal.outcome.in_(ACTIVE_OUTCOMES))
+        .order_by(Signal.fired_at.desc())
+        .limit(1)
+    )
+    return result.scalar_one_or_none()
+
+
 async def get_open_signals(session: AsyncSession) -> list[Signal]:
     result = await session.execute(
         select(Signal).where(Signal.outcome.in_(ACTIVE_OUTCOMES))

@@ -11,7 +11,7 @@ from zoneinfo import ZoneInfo
 from bot.config import cfg, SIGNAL_CFG, RISK_CFG, COUNTER_TREND_RISK_CFG
 from bot.db.session import AsyncSessionLocal
 from bot.db.repositories.watchlist_repo import get_watchlist
-from bot.db.repositories.signal_repo import get_last_signal_for_symbol, save_signal
+from bot.db.repositories.signal_repo import get_active_signal_for_symbol, get_last_signal_for_symbol, save_signal
 from bot.formatter import format_signal_message, format_market_closed_message
 from src.instruments import load_instrument_cfg, get_display_name
 from src.data_fetcher import fetch_ohlcv, get_live_price
@@ -220,6 +220,15 @@ async def _duplicate_suppression_reason(symbol: str, direction: str) -> str | No
         return f"{direction} already sent. Cooldown: {minutes}m left"
 
 
+async def _open_trade_suppression_reason(symbol: str) -> str | None:
+    """Block auto alerts while an earlier trade is still open."""
+    async with AsyncSessionLocal() as session:
+        active = await get_active_signal_for_symbol(session, symbol)
+        if not active:
+            return None
+        return f"{active.direction} trade still open. Waiting for TP or SL"
+
+
 async def _prepare_live_trade(symbol: str, result: dict) -> tuple[float | None, object | None]:
     signal = result["signal"]
     trade = result["trade"]
@@ -275,6 +284,11 @@ async def broadcast_signal_if_allowed(
         return False, signal.reason or "No clean setup"
 
     if enforce_cooldown:
+        open_reason = await _open_trade_suppression_reason(symbol)
+        if open_reason:
+            logger.info(f"{symbol}: {open_reason}")
+            return False, open_reason
+
         duplicate_reason = await _duplicate_suppression_reason(symbol, signal.direction)
         if duplicate_reason:
             logger.info(f"{symbol}: {duplicate_reason}")

@@ -95,14 +95,14 @@ def generate_signal(
         raw_dir = "BUY"
         strength = bull_count
         reason = f"{htf_label} bullish trend + {entry_label} bullish confirmation"
-        if rsi > 70:
+        if rsi > 65:
             raw_dir = "HOLD"
             reason = "BUY blocked: RSI is overbought"
     elif htf_bias == "BEARISH" and bear_count >= min_confluence:
         raw_dir = "SELL"
         strength = bear_count
         reason = f"{htf_label} bearish trend + {entry_label} bearish confirmation"
-        if rsi < 30:
+        if rsi < 35:
             raw_dir = "HOLD"
             reason = "SELL blocked: RSI is oversold"
     elif htf_bias == "BULLISH" and bear_count == len(votes):
@@ -110,7 +110,7 @@ def generate_signal(
         strength = bear_count
         reason = f"{htf_label} bullish + full {entry_label} bearish override"
         is_counter_trend = True
-        if rsi < 30:
+        if rsi < 35:
             raw_dir = "HOLD"
             reason = "SELL blocked: RSI is oversold"
             is_counter_trend = False
@@ -119,7 +119,7 @@ def generate_signal(
         strength = bull_count
         reason = f"{htf_label} bearish + full {entry_label} bullish override"
         is_counter_trend = True
-        if rsi > 70:
+        if rsi > 65:
             raw_dir = "HOLD"
             reason = "BUY blocked: RSI is overbought"
             is_counter_trend = False
