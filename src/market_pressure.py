@@ -8,6 +8,9 @@ from dataclasses import dataclass
 
 import pandas as pd
 
+GOLD_SYMBOLS = {"XAUUSD", "GOLD"}
+GOLD_MIN_PRESSURE = 65
+
 
 @dataclass
 class MarketPressure:
@@ -90,8 +93,14 @@ def should_block_by_pressure(symbol: str, signal, pressure: MarketPressure) -> b
     - Gold must stay aligned with the higher-timeframe direction
     - trend-aligned Gold setups still need pressure confirmation
     """
-    if symbol.upper() in {"XAUUSD", "GOLD"} and signal.is_counter_trend:
+    if symbol.upper() in GOLD_SYMBOLS and signal.is_counter_trend:
         return True
+
+    if symbol.upper() in GOLD_SYMBOLS:
+        if signal.direction == "BUY":
+            return pressure.direction != "BUYERS" or pressure.buy_pct < GOLD_MIN_PRESSURE
+        if signal.direction == "SELL":
+            return pressure.direction != "SELLERS" or pressure.sell_pct < GOLD_MIN_PRESSURE
 
     if pressure_confirms(signal.direction, pressure):
         return False
@@ -102,9 +111,5 @@ def should_block_by_pressure(symbol: str, signal, pressure: MarketPressure) -> b
     )
     if strong_opposite:
         return True
-
-    if symbol.upper() in {"XAUUSD", "GOLD"}:
-        if pressure.direction == "MIXED":
-            return True
 
     return True

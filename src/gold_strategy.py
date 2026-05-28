@@ -25,9 +25,8 @@ def _protected_hold_reason(reason: str) -> bool:
 def apply_gold_momentum(symbol: str, signal, pressure: MarketPressure) -> None:
     """Promote high-pressure Gold continuation setups.
 
-    This catches professional-style continuation alerts without blindly trading
-    pressure alone. It still requires the 1H direction and at least partial 15M
-    indicator agreement.
+    This catches continuation alerts without trading pressure alone. It still
+    requires the 1H direction, strong pressure, and at least 3 of 4 15M votes.
     """
     if symbol.upper() not in GOLD_SYMBOLS or signal.direction != "HOLD":
         return
@@ -38,7 +37,7 @@ def apply_gold_momentum(symbol: str, signal, pressure: MarketPressure) -> None:
 
     if (
         signal.htf_bias == "BEARISH"
-        and bear_count >= 2
+        and bear_count >= 3
         and pressure.direction == "SELLERS"
         and pressure.sell_pct >= 65
     ):
@@ -50,7 +49,7 @@ def apply_gold_momentum(symbol: str, signal, pressure: MarketPressure) -> None:
 
     if (
         signal.htf_bias == "BULLISH"
-        and bull_count >= 2
+        and bull_count >= 3
         and pressure.direction == "BUYERS"
         and pressure.buy_pct >= 65
     ):
