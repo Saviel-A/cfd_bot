@@ -17,7 +17,7 @@ from src.instruments import load_instrument_cfg, get_display_name
 from src.data_fetcher import fetch_ohlcv, get_live_price
 from src.indicators import compute_all
 from src.signal_engine import generate_signal
-from src.risk_manager import calculate_trade
+from src.risk_manager import calculate_trade, get_pip_size
 from src.market_pressure import analyze_market_pressure, should_block_by_pressure
 from src.chart import generate_chart
 from src.calendar import check_news_risk
@@ -40,6 +40,29 @@ def _seconds_until_next_hour() -> float:
 def _market_open_now() -> bool:
     """True if forex/metals market is open right now (covers most watchlist instruments)."""
     return _is_open("forex", datetime.now(timezone.utc))
+
+
+def _auto_session_suppression_reason(symbol: str) -> str | None:
+    """Avoid opening Gold alerts during late/overnight liquidity."""
+    if symbol.upper() not in {"XAUUSD", "GOLD"}:
+        return None
+    now_il = datetime.now(timezone.utc).astimezone(_IL)
+    minutes = now_il.hour * 60 + now_il.minute
+    start = 8 * 60
+    end = 19 * 60 + 30
+    if start <= minutes <= end:
+        return None
+    return "Gold auto alerts paused outside 08:00-19:30 Israel time"
+
+
+def _volatility_suppression_reason(symbol: str, atr: float) -> str | None:
+    """Block when normal candle movement is wider than the allowed SL cap."""
+    if symbol.upper() not in {"XAUUSD", "GOLD"} or atr <= 0:
+        return None
+    max_stop = float(RISK_CFG.get("sl_max", 10)) * get_pip_size(symbol)
+    if atr > max_stop:
+        return f"Gold volatility too high for {max_stop:.0f}-point SL"
+    return None
 
 
 async def _fetch(ticker: str, timeframe: str, lookback: int = 200):
@@ -81,6 +104,20 @@ async def scan_symbol(symbol: str) -> dict | None:
         atr   = float(df.iloc[-1].get("atr", 0) or 0)
         trade = None
         if signal.direction in ("BUY", "SELL"):
+            volatility_reason = _volatility_suppression_reason(symbol, atr)
+            if volatility_reason:
+                signal.reason = f"{signal.direction} blocked: {volatility_reason}"
+                signal.direction = "HOLD"
+                return {
+                    "symbol":       symbol,
+                    "ticker":       ticker,
+                    "signal":       signal,
+                    "trade":        None,
+                    "atr":          atr,
+                    "market_pressure": pressure.as_dict(),
+                    "display_name": get_display_name(symbol),
+                }
+
             risk = COUNTER_TREND_RISK_CFG if signal.is_counter_trend else RISK_CFG
             trade = calculate_trade(signal.direction, signal.current_price, atr, risk, symbol=symbol)
             if trade is None:
@@ -284,6 +321,11 @@ async def broadcast_signal_if_allowed(
         return False, signal.reason or "No clean setup"
 
     if enforce_cooldown:
+        session_reason = _auto_session_suppression_reason(symbol)
+        if session_reason:
+            logger.info(f"{symbol}: {session_reason}")
+            return False, session_reason
+
         open_reason = await _open_trade_suppression_reason(symbol)
         if open_reason:
             logger.info(f"{symbol}: {open_reason}")
