@@ -87,9 +87,12 @@ def should_block_by_pressure(symbol: str, signal, pressure: MarketPressure) -> b
     """Return True when pressure should block a signal.
 
     Gold is intentionally more active, but strong opposite pressure still blocks:
-    - trend-aligned Gold setups can pass on mixed pressure
-    - counter-trend Gold setups need perfect confluence
+    - Gold must stay aligned with the higher-timeframe direction
+    - trend-aligned Gold setups still need pressure confirmation
     """
+    if symbol.upper() in {"XAUUSD", "GOLD"} and signal.is_counter_trend:
+        return True
+
     if pressure_confirms(signal.direction, pressure):
         return False
 
@@ -101,8 +104,6 @@ def should_block_by_pressure(symbol: str, signal, pressure: MarketPressure) -> b
         return True
 
     if symbol.upper() in {"XAUUSD", "GOLD"}:
-        if signal.is_counter_trend:
-            return True
         if pressure.direction == "MIXED":
             return True
 
