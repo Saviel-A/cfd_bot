@@ -112,7 +112,7 @@ def generate_signal(
         is_counter_trend = True
         if rsi < 35:
             raw_dir = "HOLD"
-            reason = "SELL blocked: RSI is oversold"
+            reason = f"SELL blocked: RSI is oversold + counter-trend to {htf_label} bullish bias"
             is_counter_trend = False
     elif htf_bias == "BEARISH" and bull_count == len(votes):
         raw_dir = "BUY"
@@ -121,7 +121,7 @@ def generate_signal(
         is_counter_trend = True
         if rsi > 65:
             raw_dir = "HOLD"
-            reason = "BUY blocked: RSI is overbought"
+            reason = f"BUY blocked: RSI is overbought + counter-trend to {htf_label} bearish bias"
             is_counter_trend = False
     else:
         raw_dir = "HOLD"
