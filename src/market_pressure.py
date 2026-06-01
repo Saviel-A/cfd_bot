@@ -9,7 +9,8 @@ from dataclasses import dataclass
 import pandas as pd
 
 GOLD_SYMBOLS = {"XAUUSD", "GOLD"}
-GOLD_MIN_PRESSURE = 65
+GOLD_MIN_PRESSURE = 55
+GOLD_OPPOSITE_PRESSURE_BLOCK = 60
 
 
 @dataclass
@@ -98,9 +99,15 @@ def should_block_by_pressure(symbol: str, signal, pressure: MarketPressure) -> b
 
     if symbol.upper() in GOLD_SYMBOLS:
         if signal.direction == "BUY":
-            return pressure.direction != "BUYERS" or pressure.buy_pct < GOLD_MIN_PRESSURE
+            return (
+                pressure.buy_pct < GOLD_MIN_PRESSURE
+                or pressure.sell_pct >= GOLD_OPPOSITE_PRESSURE_BLOCK
+            )
         if signal.direction == "SELL":
-            return pressure.direction != "SELLERS" or pressure.sell_pct < GOLD_MIN_PRESSURE
+            return (
+                pressure.sell_pct < GOLD_MIN_PRESSURE
+                or pressure.buy_pct >= GOLD_OPPOSITE_PRESSURE_BLOCK
+            )
 
     if pressure_confirms(signal.direction, pressure):
         return False

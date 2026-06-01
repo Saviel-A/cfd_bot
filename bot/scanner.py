@@ -43,16 +43,16 @@ def _market_open_now() -> bool:
 
 
 def _auto_session_suppression_reason(symbol: str) -> str | None:
-    """Avoid opening Gold alerts during late/overnight liquidity."""
+    """Avoid opening Gold alerts during overnight liquidity."""
     if symbol.upper() not in {"XAUUSD", "GOLD"}:
         return None
     now_il = datetime.now(timezone.utc).astimezone(_IL)
     minutes = now_il.hour * 60 + now_il.minute
     start = 8 * 60
-    end = 19 * 60 + 30
+    end = 22 * 60 + 30
     if start <= minutes <= end:
         return None
-    return "Gold auto alerts paused outside 08:00-19:30 Israel time"
+    return "Gold auto alerts paused outside 08:00-22:30 Israel time"
 
 
 def _volatility_suppression_reason(symbol: str, atr: float) -> str | None:

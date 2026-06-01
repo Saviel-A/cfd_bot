@@ -78,6 +78,10 @@ def _pressure_line(market_pressure: Optional[dict]) -> str:
         return f"Buyers {buy_pct:.0f}%"
     if direction == "Sellers":
         return f"Sellers {sell_pct:.0f}%"
+    if buy_pct > sell_pct:
+        return f"Buyers {buy_pct:.0f}%"
+    if sell_pct > buy_pct:
+        return f"Sellers {sell_pct:.0f}%"
     return f"Mixed pressure"
 
 
