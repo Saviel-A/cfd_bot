@@ -90,10 +90,7 @@ def _adx_suppression_reason(symbol: str, df) -> str | None:
 
 
 def _risk_config_for_signal(symbol: str, signal) -> dict:
-    risk = COUNTER_TREND_RISK_CFG if signal.is_counter_trend else RISK_CFG
-    if symbol.upper() in {"XAUUSD", "GOLD"}:
-        return {**risk, "rr1": 1.0}
-    return risk
+    return COUNTER_TREND_RISK_CFG if signal.is_counter_trend else RISK_CFG
 
 
 async def _fetch(ticker: str, timeframe: str, lookback: int = 200):
