@@ -26,7 +26,7 @@ def apply_gold_momentum(symbol: str, signal, pressure: MarketPressure) -> None:
     """Promote high-pressure Gold continuation setups.
 
     This catches continuation alerts without trading pressure alone. It still
-    requires the 1H direction, strong pressure, and at least 3 of 4 15M votes.
+    requires the 1H direction, strong pressure, and all 4 15M votes.
     """
     if symbol.upper() not in GOLD_SYMBOLS or signal.direction != "HOLD":
         return
@@ -35,14 +35,14 @@ def apply_gold_momentum(symbol: str, signal, pressure: MarketPressure) -> None:
 
     bull_count, bear_count = _vote_counts(signal)
 
-    if signal.htf_bias == "BEARISH" and bear_count >= 3 and pressure.sell_pct >= 60:
+    if signal.htf_bias == "BEARISH" and bear_count >= 3 and pressure.sell_pct >= 65:
         signal.direction = "SELL"
         signal.strength = bear_count
         signal.reason = "1H bearish + seller momentum"
         signal.is_counter_trend = False
         return
 
-    if signal.htf_bias == "BULLISH" and bull_count >= 3 and pressure.buy_pct >= 60:
+    if signal.htf_bias == "BULLISH" and bull_count >= 3 and pressure.buy_pct >= 65:
         signal.direction = "BUY"
         signal.strength = bull_count
         signal.reason = "1H bullish + buyer momentum"

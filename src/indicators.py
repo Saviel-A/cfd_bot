@@ -32,9 +32,34 @@ def add_rsi(df: pd.DataFrame, period: int = 14, oversold: int = 30, overbought: 
     df["rsi"] = 100 - (100 / (1 + rs))
     df["rsi"] = df["rsi"].fillna(50)
 
+    # Neutral zone 48-52 votes 0 — avoids false signals at the midline.
     df["rsi_signal"] = 0
-    df.loc[df["rsi"] > 50, "rsi_signal"] = 1
-    df.loc[df["rsi"] < 50, "rsi_signal"] = -1
+    df.loc[df["rsi"] > 52, "rsi_signal"] = 1
+    df.loc[df["rsi"] < 48, "rsi_signal"] = -1
+    return df
+
+
+def add_adx(df: pd.DataFrame, period: int = 14) -> pd.DataFrame:
+    df = df.copy()
+    up_move   = df["high"] - df["high"].shift(1)
+    down_move = df["low"].shift(1) - df["low"]
+
+    dm_plus  = up_move.where((up_move > down_move) & (up_move > 0), 0.0)
+    dm_minus = down_move.where((down_move > up_move) & (down_move > 0), 0.0)
+
+    high_low   = df["high"] - df["low"]
+    high_close = (df["high"] - df["close"].shift(1)).abs()
+    low_close  = (df["low"]  - df["close"].shift(1)).abs()
+    tr = pd.concat([high_low, high_close, low_close], axis=1).max(axis=1)
+
+    atr_s    = tr.ewm(com=period - 1, adjust=False).mean()
+    di_plus  = 100 * dm_plus.ewm(com=period  - 1, adjust=False).mean() / atr_s.replace(0, np.nan)
+    di_minus = 100 * dm_minus.ewm(com=period - 1, adjust=False).mean() / atr_s.replace(0, np.nan)
+
+    dx = 100 * (di_plus - di_minus).abs() / (di_plus + di_minus).replace(0, np.nan)
+    df["adx"]      = dx.ewm(com=period - 1, adjust=False).mean().fillna(0)
+    df["di_plus"]  = di_plus.fillna(0)
+    df["di_minus"] = di_minus.fillna(0)
     return df
 
 
@@ -105,5 +130,9 @@ def compute_all(df: pd.DataFrame, instrument_cfg: dict) -> pd.DataFrame:
     df = add_atr(
         df,
         period=instrument_cfg.get("atr", {}).get("period", 14),
+    )
+    df = add_adx(
+        df,
+        period=instrument_cfg.get("adx", {}).get("period", 14),
     )
     return df

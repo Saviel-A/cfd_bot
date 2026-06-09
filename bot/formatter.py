@@ -58,7 +58,10 @@ def _format_reason(reason: str) -> str:
         "1H bullish + buyer momentum": "1H bullish + buyer momentum",
         "Not enough aligned confirmation": "Not enough confirmation",
         "4H trend is neutral": "4H trend is neutral",
+        "1H trend is neutral": "1H trend is neutral",
     }
+    if clean.startswith("BUY blocked: Market is ranging") or clean.startswith("SELL blocked: Market is ranging"):
+        return clean.split("blocked: ", 1)[-1].capitalize()
     return replacements.get(clean, clean[:1].upper() + clean[1:])
 
 

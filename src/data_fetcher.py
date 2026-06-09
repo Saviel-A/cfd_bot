@@ -39,7 +39,7 @@ _SWISSQUOTE_MAP: dict[str, tuple[str, str]] = {
 }
 
 
-def _swissquote_price(symbol: str) -> float | None:
+def _swissquote_quote(symbol: str) -> dict[str, float] | None:
     pair = _SWISSQUOTE_MAP.get(symbol.upper())
     if not pair:
         return None
@@ -50,10 +50,17 @@ def _swissquote_price(symbol: str) -> float | None:
                 data = json.loads(resp.read())
             if data:
                 prices = data[0]["spreadProfilePrices"]
-                return (float(prices[0]["bid"]) + float(prices[0]["ask"])) / 2
+                bid = float(prices[0]["bid"])
+                ask = float(prices[0]["ask"])
+                return {"bid": bid, "ask": ask, "mid": (bid + ask) / 2}
         except Exception:
             pass
     return None
+
+
+def _swissquote_price(symbol: str) -> float | None:
+    quote = _swissquote_quote(symbol)
+    return quote["mid"] if quote else None
 
 
 # CoinGecko live prices (crypto)
@@ -221,3 +228,20 @@ def get_live_price(symbol: str) -> float:
 
     ticker = get_ticker_for_symbol(symbol)
     return get_current_price(ticker)
+
+
+def get_live_quote(symbol: str) -> dict[str, float]:
+    """
+    Return bid/ask/mid when available.
+    For feeds that only provide one price, bid/ask/mid all use that value.
+    """
+    quote = _swissquote_quote(symbol)
+    if quote:
+        return quote
+
+    price = _coingecko_price(symbol)
+    if price is None:
+        from src.instruments import get_ticker_for_symbol
+
+        price = get_current_price(get_ticker_for_symbol(symbol))
+    return {"bid": price, "ask": price, "mid": price}

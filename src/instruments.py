@@ -149,9 +149,19 @@ def resolve_symbol(raw: str) -> tuple[str, str, str]:
     return upper, raw, raw
 
 
+_INSTRUMENT_OVERRIDES: dict[str, dict] = {
+    # Gold on 15M: slower EMA reduces false crossovers compared to default 9/21
+    "XAUUSD": {"ema": {"fast": 21, "slow": 55}},
+    "GOLD":   {"ema": {"fast": 21, "slow": 55}},
+}
+
+
 def load_instrument_cfg(symbol: str) -> dict:
     _, ticker, display = resolve_symbol(symbol)
-    cfg = dict(DEFAULT_CFG)
+    cfg = {**DEFAULT_CFG}
+    override = _INSTRUMENT_OVERRIDES.get(symbol.upper(), {})
+    for key, val in override.items():
+        cfg[key] = {**cfg.get(key, {}), **val}
     cfg["ticker"] = ticker
     cfg["display_name"] = display
     return cfg

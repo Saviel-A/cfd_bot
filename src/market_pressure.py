@@ -9,8 +9,8 @@ from dataclasses import dataclass
 import pandas as pd
 
 GOLD_SYMBOLS = {"XAUUSD", "GOLD"}
-GOLD_MIN_PRESSURE = 55
-GOLD_OPPOSITE_PRESSURE_BLOCK = 60
+GOLD_MIN_PRESSURE = 60
+GOLD_OPPOSITE_PRESSURE_BLOCK = 55
 
 
 @dataclass
@@ -39,7 +39,7 @@ class MarketPressure:
         }
 
 
-def analyze_market_pressure(df: pd.DataFrame, lookback: int = 12) -> MarketPressure:
+def analyze_market_pressure(df: pd.DataFrame, lookback: int = 20) -> MarketPressure:
     """Estimate buyer/seller pressure from recent closed candles."""
     if df is None or df.empty:
         return MarketPressure("MIXED", 50.0, 50.0, 0.0, "no candle data")

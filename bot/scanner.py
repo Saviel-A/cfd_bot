@@ -65,6 +65,37 @@ def _volatility_suppression_reason(symbol: str, atr: float) -> str | None:
     return None
 
 
+def _gold_quality_suppression_reason(symbol: str, signal, df, pressure) -> str | None:
+    """Extra conservative filters for Gold alerts."""
+    if symbol.upper() not in {"XAUUSD", "GOLD"} or signal.direction not in ("BUY", "SELL"):
+        return None
+    if signal.strength < 4:
+        aligned_pressure = pressure.buy_pct if signal.direction == "BUY" else pressure.sell_pct
+        if signal.strength < 3 or aligned_pressure < 70:
+            return "Gold requires 4/4 confirmation or 3/4 with very strong pressure"
+    if df is None or len(df) < 2:
+        return "Gold requires enough closed candles"
+
+    return None
+
+
+def _adx_suppression_reason(symbol: str, df) -> str | None:
+    """Block signals when the market has no directional trend (ADX too low)."""
+    if df is None or "adx" not in df.columns:
+        return None
+    adx = float(df.iloc[-1].get("adx", 0) or 0)
+    if adx < 20:
+        return f"Market is ranging (ADX {adx:.0f})"
+    return None
+
+
+def _risk_config_for_signal(symbol: str, signal) -> dict:
+    risk = COUNTER_TREND_RISK_CFG if signal.is_counter_trend else RISK_CFG
+    if symbol.upper() in {"XAUUSD", "GOLD"}:
+        return {**risk, "rr1": 1.0}
+    return risk
+
+
 async def _fetch(ticker: str, timeframe: str, lookback: int = 200):
     loop = asyncio.get_running_loop()
     return await loop.run_in_executor(
@@ -104,6 +135,34 @@ async def scan_symbol(symbol: str) -> dict | None:
         atr   = float(df.iloc[-1].get("atr", 0) or 0)
         trade = None
         if signal.direction in ("BUY", "SELL"):
+            adx_reason = _adx_suppression_reason(symbol, df)
+            if adx_reason:
+                signal.reason = f"{signal.direction} blocked: {adx_reason}"
+                signal.direction = "HOLD"
+                return {
+                    "symbol":          symbol,
+                    "ticker":          ticker,
+                    "signal":          signal,
+                    "trade":           None,
+                    "atr":             atr,
+                    "market_pressure": pressure.as_dict(),
+                    "display_name":    get_display_name(symbol),
+                }
+
+            quality_reason = _gold_quality_suppression_reason(symbol, signal, df, pressure)
+            if quality_reason:
+                signal.reason = f"{signal.direction} blocked: {quality_reason}"
+                signal.direction = "HOLD"
+                return {
+                    "symbol":       symbol,
+                    "ticker":       ticker,
+                    "signal":       signal,
+                    "trade":        None,
+                    "atr":          atr,
+                    "market_pressure": pressure.as_dict(),
+                    "display_name": get_display_name(symbol),
+                }
+
             volatility_reason = _volatility_suppression_reason(symbol, atr)
             if volatility_reason:
                 signal.reason = f"{signal.direction} blocked: {volatility_reason}"
@@ -118,7 +177,7 @@ async def scan_symbol(symbol: str) -> dict | None:
                     "display_name": get_display_name(symbol),
                 }
 
-            risk = COUNTER_TREND_RISK_CFG if signal.is_counter_trend else RISK_CFG
+            risk = _risk_config_for_signal(symbol, signal)
             trade = calculate_trade(signal.direction, signal.current_price, atr, risk, symbol=symbol)
             if trade is None:
                 signal.reason = f"{signal.direction} blocked: risk levels unavailable"
@@ -198,7 +257,7 @@ async def _broadcast_signal(bot, symbol: str, result: dict):
         except Exception:
             pass
     if live_price and atr > 0:
-        risk = COUNTER_TREND_RISK_CFG if signal.is_counter_trend else RISK_CFG
+        risk = _risk_config_for_signal(symbol, signal)
         trade = calculate_trade(signal.direction, live_price, atr, risk, symbol=symbol)
 
     msg = format_signal_message(
@@ -240,15 +299,14 @@ async def _duplicate_suppression_reason(symbol: str, direction: str) -> str | No
         fired = last.fired_at if last.fired_at.tzinfo else last.fired_at.replace(tzinfo=timezone.utc)
         elapsed = datetime.now(timezone.utc) - fired
 
+        cooldown = timedelta(minutes=signal_profile(symbol)["duplicate_cooldown_minutes"])
         if last.direction != direction:
-            reversal_cooldown = timedelta(minutes=60)
-            remaining = reversal_cooldown - elapsed
+            remaining = cooldown - elapsed
             if remaining > timedelta(0):
                 minutes = max(1, int(remaining.total_seconds() // 60))
                 return f"{direction} blocked: last alert was {last.direction}. Wait {minutes}m before flipping direction"
             return None
 
-        cooldown = timedelta(minutes=signal_profile(symbol)["duplicate_cooldown_minutes"])
         remaining = cooldown - elapsed
         if remaining <= timedelta(0):
             return None
@@ -279,7 +337,7 @@ async def _prepare_live_trade(symbol: str, result: dict) -> tuple[float | None, 
         pass
 
     if live_price and atr > 0:
-        risk = COUNTER_TREND_RISK_CFG if signal.is_counter_trend else RISK_CFG
+        risk = _risk_config_for_signal(symbol, signal)
         trade = calculate_trade(signal.direction, live_price, atr, risk, symbol=symbol)
 
     return live_price, trade
