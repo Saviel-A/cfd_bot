@@ -25,8 +25,8 @@ class Config:
     HTF_TIMEFRAME: str       = "4h"
     MIN_CONFLUENCE: int      = 3     # indicators must agree out of 4
     SL_ATR_MULTIPLIER: float = float(os.getenv("SL_ATR_MULTIPLIER", "0.5"))
-    SL_MIN: float            = 7.0   # pips
-    SL_MAX: float            = 10.0  # pips
+    SL_MIN: float            = float(os.getenv("SL_MIN", "7.0"))
+    SL_MAX: float            = float(os.getenv("SL_MAX", "10.0"))
     RR1: float               = float(os.getenv("RR1", "1.5"))
     ACCOUNT_BALANCE: float   = 10000
     RISK_PERCENT: float      = 1.5
