@@ -50,7 +50,7 @@ def analyze_market_pressure(df: pd.DataFrame, lookback: int = 20) -> MarketPress
 
     candle_range = (recent["high"] - recent["low"]).abs()
     candle_range = candle_range.where(candle_range != 0)
-    body_ratio = ((recent["close"] - recent["open"]) / candle_range).astype("float64").fillna(0).clip(-1, 1)
+    body_ratio = ((recent["close"] - recent["open"]) / candle_range).astype("float64").infer_objects(copy=False).fillna(0).clip(-1, 1)
 
     if "volume" in recent.columns and float(recent["volume"].fillna(0).sum()) > 0:
         weights = recent["volume"].fillna(0).astype(float)
