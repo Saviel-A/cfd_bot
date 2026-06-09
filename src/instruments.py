@@ -149,11 +149,7 @@ def resolve_symbol(raw: str) -> tuple[str, str, str]:
     return upper, raw, raw
 
 
-_INSTRUMENT_OVERRIDES: dict[str, dict] = {
-    # Gold on 15M: slower EMA reduces false crossovers compared to default 9/21
-    "XAUUSD": {"ema": {"fast": 21, "slow": 55}},
-    "GOLD":   {"ema": {"fast": 21, "slow": 55}},
-}
+_INSTRUMENT_OVERRIDES: dict[str, dict] = {}
 
 
 def load_instrument_cfg(symbol: str) -> dict:

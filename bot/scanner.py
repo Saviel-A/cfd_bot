@@ -84,7 +84,7 @@ def _adx_suppression_reason(symbol: str, df) -> str | None:
     if df is None or "adx" not in df.columns:
         return None
     adx = float(df.iloc[-1].get("adx", 0) or 0)
-    if adx < 20:
+    if adx < 15:
         return f"Market is ranging (ADX {adx:.0f})"
     return None
 
