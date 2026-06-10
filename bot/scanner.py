@@ -43,16 +43,17 @@ def _market_open_now() -> bool:
 
 
 def _auto_session_suppression_reason(symbol: str) -> str | None:
-    """Avoid opening Gold alerts during overnight liquidity."""
+    """Only alert during London open + NY overlap (07:00-17:00 UTC).
+    Asian session signals on gold have negative expectancy."""
     if symbol.upper() not in {"XAUUSD", "GOLD"}:
         return None
     now_il = datetime.now(timezone.utc).astimezone(_IL)
     minutes = now_il.hour * 60 + now_il.minute
-    start = 8 * 60
-    end = 22 * 60 + 30
+    start = 10 * 60       # 10:00 Israel = 07:00 UTC
+    end   = 20 * 60       # 20:00 Israel = 17:00 UTC
     if start <= minutes <= end:
         return None
-    return "Gold auto alerts paused outside 08:00-22:30 Israel time"
+    return "Gold alerts paused outside London/NY session (10:00-20:00 Israel)"
 
 
 def _gold_quality_suppression_reason(symbol: str, signal, df, pressure) -> str | None:
@@ -71,8 +72,8 @@ def _adx_suppression_reason(symbol: str, df) -> str | None:
     if df is None or "adx" not in df.columns:
         return None
     adx = float(df.iloc[-1].get("adx", 0) or 0)
-    if adx < 15:
-        return f"Market is ranging (ADX {adx:.0f})"
+    if adx < 20:
+        return f"Market is ranging (ADX {adx:.0f} < 20)"
     return None
 
 

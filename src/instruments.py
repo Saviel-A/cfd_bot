@@ -149,7 +149,12 @@ def resolve_symbol(raw: str) -> tuple[str, str, str]:
     return upper, raw, raw
 
 
-_INSTRUMENT_OVERRIDES: dict[str, dict] = {}
+_INSTRUMENT_OVERRIDES: dict[str, dict] = {
+    # Gold on 15M: faster MACD (8,21,5) reduces lag vs default (12,26,9)
+    # RSI period 9 is more responsive on 15M without being as noisy as 7
+    "XAUUSD": {"macd": {"fast": 8, "slow": 21, "signal": 5}, "rsi": {"period": 9}},
+    "GOLD":   {"macd": {"fast": 8, "slow": 21, "signal": 5}, "rsi": {"period": 9}},
+}
 
 
 def load_instrument_cfg(symbol: str) -> dict:
