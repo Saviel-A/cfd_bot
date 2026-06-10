@@ -64,7 +64,29 @@ def _gold_quality_suppression_reason(symbol: str, signal, df, pressure) -> str |
         return "Gold requires at least 3/4 indicator confirmation"
     if df is None or len(df) < 2:
         return "Gold requires enough closed candles"
+    last = df.iloc[-1]
+    candle_range = abs(float(last["high"]) - float(last["low"]))
+    body = abs(float(last["close"]) - float(last["open"]))
+    if candle_range > 0 and body / candle_range < 0.35:
+        return f"Gold entry rejected: indecision candle (body {body/candle_range:.0%} of range)"
+    if "volume" in df.columns:
+        vol = float(last.get("volume", 0) or 0)
+        avg_vol = float(df["volume"].tail(20).mean() or 0)
+        if avg_vol > 0 and vol < avg_vol * 0.6:
+            return "Gold entry rejected: low volume (below 60% of 20-bar average)"
     return None
+
+
+def _swing_sl_distance(direction: str, df) -> float | None:
+    """Distance from last close to the nearest swing high/low over 8 candles."""
+    if df is None or len(df) < 8:
+        return None
+    recent = df.iloc[-8:]
+    close = float(df.iloc[-1]["close"])
+    if direction == "BUY":
+        return close - float(recent["low"].min())
+    else:
+        return float(recent["high"].max()) - close
 
 
 def _adx_suppression_reason(symbol: str, df) -> str | None:
@@ -147,6 +169,26 @@ async def scan_symbol(symbol: str) -> dict | None:
                     "market_pressure": pressure.as_dict(),
                     "display_name": get_display_name(symbol),
                 }
+
+            if symbol.upper() in {"XAUUSD", "GOLD"}:
+                swing_dist = _swing_sl_distance(signal.direction, df)
+                if swing_dist is not None:
+                    pip = get_pip_size(symbol)
+                    risk_temp = _risk_config_for_signal(symbol, signal)
+                    sl_max_pts = float(risk_temp.get("sl_max", 10))
+                    swing_pts = swing_dist / pip
+                    if swing_pts > sl_max_pts:
+                        signal.reason = f"{signal.direction} blocked: structure SL {swing_pts:.1f}pts (max {sl_max_pts:.0f}pts)"
+                        signal.direction = "HOLD"
+                        return {
+                            "symbol":          symbol,
+                            "ticker":          ticker,
+                            "signal":          signal,
+                            "trade":           None,
+                            "atr":             atr,
+                            "market_pressure": pressure.as_dict(),
+                            "display_name":    get_display_name(symbol),
+                        }
 
             risk = _risk_config_for_signal(symbol, signal)
             trade = calculate_trade(signal.direction, signal.current_price, atr, risk, symbol=symbol)

@@ -6,6 +6,7 @@ updates the DB, and posts the result to the broadcast channel.
 
 import asyncio
 import logging
+from datetime import datetime, timezone, timedelta
 
 from bot.config import cfg
 from bot.db.session import AsyncSessionLocal
@@ -100,6 +101,24 @@ async def run_outcome_tracker(bot, interval_seconds: int = CHECK_INTERVAL_SECOND
 
                     outcome, price = _check_quote_outcome(signal, quote)
                     if outcome is None:
+                        fired_at = signal.fired_at
+                        if fired_at.tzinfo is None:
+                            fired_at = fired_at.replace(tzinfo=timezone.utc)
+                        if datetime.now(timezone.utc) - fired_at > timedelta(hours=24):
+                            async with AsyncSessionLocal() as session:
+                                await update_outcome(session, signal.id, "EXPIRED")
+                            logger.info(f"Signal {signal.id} ({signal.symbol} {signal.direction}) expired after 24h")
+                            if cfg.BROADCAST_CHANNEL_ID:
+                                try:
+                                    dot = "📈" if signal.direction == "BUY" else "📉"
+                                    await bot.send_message(
+                                        cfg.BROADCAST_CHANNEL_ID,
+                                        f"{dot} <b>{signal.symbol} {signal.direction}</b>\n\n"
+                                        f"⏰ Signal expired — no TP or SL hit within 24h.",
+                                        parse_mode="HTML",
+                                    )
+                                except Exception as e:
+                                    logger.error(f"Expiry broadcast failed for {signal.id}: {e}")
                         continue
 
                     async with AsyncSessionLocal() as session:
