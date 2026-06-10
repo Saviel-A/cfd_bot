@@ -63,14 +63,6 @@ def _gold_quality_suppression_reason(symbol: str, signal, df, pressure) -> str |
         return "Gold requires at least 3/4 indicator confirmation"
     if df is None or len(df) < 2:
         return "Gold requires enough closed candles"
-
-    # Bollinger squeeze: bands must be expanding — entering a squeeze means entering chop
-    if "bb_bandwidth" in df.columns and len(df) >= 3:
-        bw_now  = float(df["bb_bandwidth"].iloc[-1] or 0)
-        bw_prev = float(df["bb_bandwidth"].iloc[-2] or 0)
-        if bw_now < bw_prev and bw_now > 0:
-            return "Bollinger bands squeezing — wait for breakout"
-
     return None
 
 
