@@ -55,24 +55,12 @@ def _auto_session_suppression_reason(symbol: str) -> str | None:
     return "Gold auto alerts paused outside 08:00-22:30 Israel time"
 
 
-def _volatility_suppression_reason(symbol: str, atr: float) -> str | None:
-    """Block when normal candle movement is wider than the allowed SL cap."""
-    if symbol.upper() not in {"XAUUSD", "GOLD"} or atr <= 0:
-        return None
-    max_stop = float(RISK_CFG.get("sl_max", 10)) * get_pip_size(symbol)
-    if atr > max_stop:
-        return f"Gold volatility too high for {max_stop:.0f}-point SL"
-    return None
-
-
 def _gold_quality_suppression_reason(symbol: str, signal, df, pressure) -> str | None:
     """Extra conservative filters for Gold alerts."""
     if symbol.upper() not in {"XAUUSD", "GOLD"} or signal.direction not in ("BUY", "SELL"):
         return None
-    if signal.strength < 4:
-        aligned_pressure = pressure.buy_pct if signal.direction == "BUY" else pressure.sell_pct
-        if signal.strength < 3 or aligned_pressure < 70:
-            return "Gold requires 4/4 confirmation or 3/4 with very strong pressure"
+    if signal.strength < 3:
+        return "Gold requires at least 3/4 indicator confirmation"
     if df is None or len(df) < 2:
         return "Gold requires enough closed candles"
 
@@ -82,15 +70,6 @@ def _gold_quality_suppression_reason(symbol: str, signal, df, pressure) -> str |
         bw_prev = float(df["bb_bandwidth"].iloc[-2] or 0)
         if bw_now < bw_prev and bw_now > 0:
             return "Bollinger bands squeezing — wait for breakout"
-
-    # MACD histogram must confirm direction (momentum building, not fading)
-    if "macd_hist" in df.columns and len(df) >= 3:
-        hist_now  = float(df["macd_hist"].iloc[-1] or 0)
-        hist_prev = float(df["macd_hist"].iloc[-2] or 0)
-        if signal.direction == "SELL" and hist_now > hist_prev:
-            return "MACD momentum weakening for SELL — histogram rising"
-        if signal.direction == "BUY" and hist_now < hist_prev:
-            return "MACD momentum weakening for BUY — histogram falling"
 
     return None
 
@@ -165,20 +144,6 @@ async def scan_symbol(symbol: str) -> dict | None:
             quality_reason = _gold_quality_suppression_reason(symbol, signal, df, pressure)
             if quality_reason:
                 signal.reason = f"{signal.direction} blocked: {quality_reason}"
-                signal.direction = "HOLD"
-                return {
-                    "symbol":       symbol,
-                    "ticker":       ticker,
-                    "signal":       signal,
-                    "trade":        None,
-                    "atr":          atr,
-                    "market_pressure": pressure.as_dict(),
-                    "display_name": get_display_name(symbol),
-                }
-
-            volatility_reason = _volatility_suppression_reason(symbol, atr)
-            if volatility_reason:
-                signal.reason = f"{signal.direction} blocked: {volatility_reason}"
                 signal.direction = "HOLD"
                 return {
                     "symbol":       symbol,

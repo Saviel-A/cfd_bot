@@ -9,8 +9,8 @@ from dataclasses import dataclass
 import pandas as pd
 
 GOLD_SYMBOLS = {"XAUUSD", "GOLD"}
-GOLD_MIN_PRESSURE = 60
-GOLD_OPPOSITE_PRESSURE_BLOCK = 55
+GOLD_MIN_PRESSURE = 55
+GOLD_OPPOSITE_PRESSURE_BLOCK = 60
 
 
 @dataclass
