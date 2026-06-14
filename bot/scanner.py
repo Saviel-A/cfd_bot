@@ -56,7 +56,7 @@ def _auto_session_suppression_reason(symbol: str) -> str | None:
     return "Gold alerts paused outside London/NY session (10:00-20:00 Israel)"
 
 
-def _gold_quality_suppression_reason(symbol: str, signal, df, pressure) -> str | None:
+def _gold_quality_suppression_reason(symbol: str, signal, df, pressure, atr: float = 0) -> str | None:
     """Extra conservative filters for Gold alerts."""
     if symbol.upper() not in {"XAUUSD", "GOLD"} or signal.direction not in ("BUY", "SELL"):
         return None
@@ -64,16 +64,48 @@ def _gold_quality_suppression_reason(symbol: str, signal, df, pressure) -> str |
         return "Gold requires at least 3/4 indicator confirmation"
     if df is None or len(df) < 2:
         return "Gold requires enough closed candles"
+
     last = df.iloc[-1]
+    pip = get_pip_size(symbol)
+
+    # ATR ceiling: SL must have room relative to volatility
+    if atr > 0:
+        atr_pts = atr / pip
+        sl_max = float(RISK_CFG.get("sl_max", 10))
+        if atr_pts > sl_max:
+            return f"Gold entry rejected: ATR {atr_pts:.1f}pts exceeds SL cap {sl_max:.0f}pts (stop inside noise)"
+
+    # Candle conviction: reject doji/indecision candles
     candle_range = abs(float(last["high"]) - float(last["low"]))
     body = abs(float(last["close"]) - float(last["open"]))
     if candle_range > 0 and body / candle_range < 0.35:
         return f"Gold entry rejected: indecision candle (body {body/candle_range:.0%} of range)"
+
+    # Price vs EMA 21: close must be on the right side of the trend
+    if "ema_21" in df.columns:
+        ema21 = float(last.get("ema_21", 0) or 0)
+        close = float(last["close"])
+        if signal.direction == "BUY" and close < ema21:
+            return "Gold entry rejected: price below EMA 21 on BUY signal"
+        if signal.direction == "SELL" and close > ema21:
+            return "Gold entry rejected: price above EMA 21 on SELL signal"
+
+    # DI direction: ADX directional indicators must confirm signal direction
+    if "di_plus" in df.columns and "di_minus" in df.columns:
+        di_plus = float(last.get("di_plus", 0) or 0)
+        di_minus = float(last.get("di_minus", 0) or 0)
+        if signal.direction == "BUY" and di_plus <= di_minus:
+            return f"Gold entry rejected: DI- {di_minus:.0f} > DI+ {di_plus:.0f} (bears stronger)"
+        if signal.direction == "SELL" and di_minus <= di_plus:
+            return f"Gold entry rejected: DI+ {di_plus:.0f} > DI- {di_minus:.0f} (bulls stronger)"
+
+    # Volume: reject low-participation fake breakouts
     if "volume" in df.columns:
         vol = float(last.get("volume", 0) or 0)
         avg_vol = float(df["volume"].tail(20).mean() or 0)
         if avg_vol > 0 and vol < avg_vol * 0.6:
             return "Gold entry rejected: low volume (below 60% of 20-bar average)"
+
     return None
 
 
@@ -156,7 +188,7 @@ async def scan_symbol(symbol: str) -> dict | None:
                     "display_name":    get_display_name(symbol),
                 }
 
-            quality_reason = _gold_quality_suppression_reason(symbol, signal, df, pressure)
+            quality_reason = _gold_quality_suppression_reason(symbol, signal, df, pressure, atr=atr)
             if quality_reason:
                 signal.reason = f"{signal.direction} blocked: {quality_reason}"
                 signal.direction = "HOLD"
