@@ -29,6 +29,9 @@ logger = logging.getLogger(__name__)
 
 _IL = ZoneInfo("Asia/Jerusalem")
 
+_proximity_alert_sent: dict[str, datetime] = {}
+_PROXIMITY_COOLDOWN = timedelta(minutes=30)
+
 
 def _seconds_until_next_hour() -> float:
     """Seconds until the next exact UTC hour (e.g. 15:00:00, 16:00:00)."""
@@ -434,6 +437,60 @@ async def broadcast_signal_if_allowed(
     return False, "Broadcast failed"
 
 
+async def _send_proximity_alert(bot, symbol: str, result: dict) -> None:
+    """Send owner-only DM when 3/4 indicators align but signal hasn't fired yet."""
+    if not cfg.OWNER_CHAT_ID:
+        return
+
+    signal = result["signal"]
+    votes  = signal.details or {}
+    bear   = sum(1 for v in votes.values() if v == -1)
+    bull   = sum(1 for v in votes.values() if v == 1)
+    pressure = result.get("market_pressure", {})
+
+    if signal.htf_bias == "BEARISH" and bear == 3:
+        approaching = "SELL"
+        count = bear
+    elif signal.htf_bias == "BULLISH" and bull == 3:
+        approaching = "BUY"
+        count = bull
+    else:
+        return
+
+    last_sent = _proximity_alert_sent.get(symbol)
+    if last_sent and datetime.now(timezone.utc) - last_sent < _PROXIMITY_COOLDOWN:
+        return
+    _proximity_alert_sent[symbol] = datetime.now(timezone.utc)
+
+    dot    = "📉" if approaching == "SELL" else "📈"
+    filled = "🔴" if approaching == "SELL" else "🟢"
+    bar    = filled * count + "⬜" * (4 - count)
+
+    ind_lines = "\n".join(
+        f"  {'✅' if v == (-1 if approaching == 'SELL' else 1) else '❌'} {name}: {'aligned' if v == (-1 if approaching == 'SELL' else 1) else 'not yet'}"
+        for name, v in votes.items()
+    )
+
+    buy_pct  = pressure.get("buy_pct", 0)
+    sell_pct = pressure.get("sell_pct", 0)
+    rsi_val  = float((result.get("signal").details or {}).get("RSI", 0) or 0)
+
+    msg = (
+        f"⚠️ <b>{symbol} — Almost Ready</b>\n\n"
+        f"{dot} <b>{approaching}</b> signal: {bar} 3/4 indicators\n\n"
+        f"<b>Indicators:</b>\n{ind_lines}\n\n"
+        f"💹 Pressure: buy <b>{buy_pct:.0f}%</b>  sell <b>{sell_pct:.0f}%</b>\n"
+        f"📍 HTF bias: <b>{signal.htf_bias}</b>\n\n"
+        f"<i>One more indicator needed to fire the alert.</i>"
+    )
+
+    try:
+        await bot.send_message(cfg.OWNER_CHAT_ID, msg, parse_mode="HTML")
+        logger.info(f"Proximity alert sent to owner: {symbol} {approaching} 3/4")
+    except Exception as e:
+        logger.error(f"Proximity alert failed for {symbol}: {e}")
+
+
 async def run_scan_loop(bot, interval_minutes: int = 60):
     logger.info(f"Scanner started: scanning every {interval_minutes}m")
 
@@ -492,6 +549,7 @@ async def run_scan_loop(bot, interval_minutes: int = 60):
                             if result["signal"].direction not in ("BUY", "SELL"):
                                 reason = result["signal"].reason or "No clean setup"
                                 logger.info(f"{symbol}: no signal - {reason}")
+                                await _send_proximity_alert(bot, symbol, result)
                                 continue
 
                             sent, reason = await broadcast_signal_if_allowed(bot, symbol, result)
