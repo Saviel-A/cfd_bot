@@ -27,14 +27,14 @@ class Signal:
 
 
 def _htf_bias(df_htf: pd.DataFrame) -> str:
-    """Determine 4H trend via EMA 50/200 (institutional golden/death cross)."""
-    if df_htf is None or len(df_htf) < 200:
+    """Determine 1H trend via EMA 20/50 — intraday-responsive bias for gold."""
+    if df_htf is None or len(df_htf) < 50:
         return "NEUTRAL"
-    ema50  = df_htf["close"].ewm(span=50,  adjust=False).mean().iloc[-1]
-    ema200 = df_htf["close"].ewm(span=200, adjust=False).mean().iloc[-1]
-    if ema50 > ema200:
+    ema20 = df_htf["close"].ewm(span=20, adjust=False).mean().iloc[-1]
+    ema50 = df_htf["close"].ewm(span=50, adjust=False).mean().iloc[-1]
+    if ema20 > ema50:
         return "BULLISH"
-    elif ema50 < ema200:
+    elif ema20 < ema50:
         return "BEARISH"
     return "NEUTRAL"
 
