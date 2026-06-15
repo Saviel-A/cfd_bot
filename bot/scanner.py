@@ -68,13 +68,6 @@ def _gold_quality_suppression_reason(symbol: str, signal, df, pressure, atr: flo
     last = df.iloc[-1]
     pip = get_pip_size(symbol)
 
-    # ATR ceiling: SL must have room relative to volatility
-    if atr > 0:
-        atr_pts = atr / pip
-        sl_max = float(RISK_CFG.get("sl_max", 10))
-        if atr_pts > sl_max:
-            return f"Gold entry rejected: ATR {atr_pts:.1f}pts exceeds SL cap {sl_max:.0f}pts (stop inside noise)"
-
     # Candle conviction: reject doji/indecision candles
     candle_range = abs(float(last["high"]) - float(last["low"]))
     body = abs(float(last["close"]) - float(last["open"]))
@@ -89,15 +82,6 @@ def _gold_quality_suppression_reason(symbol: str, signal, df, pressure, atr: flo
             return "Gold entry rejected: price below EMA 21 on BUY signal"
         if signal.direction == "SELL" and close > ema21:
             return "Gold entry rejected: price above EMA 21 on SELL signal"
-
-    # DI direction: ADX directional indicators must confirm signal direction
-    if "di_plus" in df.columns and "di_minus" in df.columns:
-        di_plus = float(last.get("di_plus", 0) or 0)
-        di_minus = float(last.get("di_minus", 0) or 0)
-        if signal.direction == "BUY" and di_plus <= di_minus:
-            return f"Gold entry rejected: DI- {di_minus:.0f} > DI+ {di_plus:.0f} (bears stronger)"
-        if signal.direction == "SELL" and di_minus <= di_plus:
-            return f"Gold entry rejected: DI+ {di_plus:.0f} > DI- {di_minus:.0f} (bulls stronger)"
 
     # Volume: reject low-participation fake breakouts
     if "volume" in df.columns:
