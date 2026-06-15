@@ -71,7 +71,7 @@ def _gold_quality_suppression_reason(symbol: str, signal, df, pressure, atr: flo
     # Candle conviction: reject doji/indecision candles
     candle_range = abs(float(last["high"]) - float(last["low"]))
     body = abs(float(last["close"]) - float(last["open"]))
-    if candle_range > 0 and body / candle_range < 0.35:
+    if candle_range > 0 and body / candle_range < 0.30:
         return f"Gold entry rejected: indecision candle (body {body/candle_range:.0%} of range)"
 
     # Price vs EMA 21: close must be on the right side of the trend

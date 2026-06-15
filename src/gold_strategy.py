@@ -35,14 +35,14 @@ def apply_gold_momentum(symbol: str, signal, pressure: MarketPressure) -> None:
 
     bull_count, bear_count = _vote_counts(signal)
 
-    if signal.htf_bias == "BEARISH" and bear_count >= 3 and pressure.sell_pct >= 65:
+    if signal.htf_bias == "BEARISH" and bear_count >= 3 and pressure.sell_pct >= 60:
         signal.direction = "SELL"
         signal.strength = bear_count
         signal.reason = "1H bearish + seller momentum"
         signal.is_counter_trend = False
         return
 
-    if signal.htf_bias == "BULLISH" and bull_count >= 3 and pressure.buy_pct >= 65:
+    if signal.htf_bias == "BULLISH" and bull_count >= 3 and pressure.buy_pct >= 60:
         signal.direction = "BUY"
         signal.strength = bull_count
         signal.reason = "1H bullish + buyer momentum"
