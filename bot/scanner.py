@@ -103,8 +103,8 @@ def _gold_quality_suppression_reason(symbol: str, signal, df, pressure, atr: flo
     if "volume" in df.columns:
         vol = float(last.get("volume", 0) or 0)
         avg_vol = float(df["volume"].tail(20).mean() or 0)
-        if avg_vol > 0 and vol < avg_vol * 0.6:
-            return "Gold entry rejected: low volume (below 60% of 20-bar average)"
+        if avg_vol > 0 and vol < avg_vol * 0.5:
+            return "Gold entry rejected: low volume (below 50% of 20-bar average)"
 
     return None
 
@@ -207,7 +207,7 @@ async def scan_symbol(symbol: str) -> dict | None:
                 if swing_dist is not None:
                     pip = get_pip_size(symbol)
                     risk_temp = _risk_config_for_signal(symbol, signal)
-                    sl_max_pts = float(risk_temp.get("sl_max", 10))
+                    sl_max_pts = float(risk_temp.get("sl_max", 10)) * 2
                     swing_pts = swing_dist / pip
                     if swing_pts > sl_max_pts:
                         signal.reason = f"{signal.direction} blocked: structure SL {swing_pts:.1f}pts (max {sl_max_pts:.0f}pts)"
