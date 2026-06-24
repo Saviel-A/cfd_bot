@@ -9,8 +9,8 @@ from dataclasses import dataclass
 import pandas as pd
 
 GOLD_SYMBOLS = {"XAUUSD", "GOLD"}
-GOLD_MIN_PRESSURE = 55
-GOLD_OPPOSITE_PRESSURE_BLOCK = 60
+GOLD_MIN_PRESSURE = 52
+GOLD_OPPOSITE_PRESSURE_BLOCK = 72
 
 
 @dataclass
@@ -90,24 +90,19 @@ def pressure_confirms(direction: str, pressure: MarketPressure) -> bool:
 def should_block_by_pressure(symbol: str, signal, pressure: MarketPressure) -> bool:
     """Return True when pressure should block a signal.
 
-    Gold is intentionally more active, but strong opposite pressure still blocks:
-    - Gold must stay aligned with the higher-timeframe direction
-    - trend-aligned Gold setups still need pressure confirmation
+    Counter-trend gold: always blocked.
+    Trend-following gold: only block if opposite pressure is overwhelming (≥80%).
+      A bounce after a sell-off will show 60-75% buying — that is the correct
+      entry point for a trend-following SELL, not a reason to skip it.
     """
     if symbol.upper() in GOLD_SYMBOLS and signal.is_counter_trend:
         return True
 
     if symbol.upper() in GOLD_SYMBOLS:
         if signal.direction == "BUY":
-            return (
-                pressure.buy_pct < GOLD_MIN_PRESSURE
-                or pressure.sell_pct >= GOLD_OPPOSITE_PRESSURE_BLOCK
-            )
+            return pressure.sell_pct >= 80
         if signal.direction == "SELL":
-            return (
-                pressure.sell_pct < GOLD_MIN_PRESSURE
-                or pressure.buy_pct >= GOLD_OPPOSITE_PRESSURE_BLOCK
-            )
+            return pressure.buy_pct >= 80
 
     if pressure_confirms(signal.direction, pressure):
         return False

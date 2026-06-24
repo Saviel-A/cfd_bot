@@ -46,20 +46,34 @@ def _market_open_now() -> bool:
 
 
 def _auto_session_suppression_reason(symbol: str) -> str | None:
-    """Only alert during London open + NY overlap (07:00-17:00 UTC).
-    Asian session signals on gold have negative expectancy."""
+    """Only alert during London + NY sessions (07:00-22:00 UTC).
+    Deep Asian session (22:00-07:00 UTC) has negative expectancy for gold."""
     if symbol.upper() not in {"XAUUSD", "GOLD"}:
         return None
-    now_il = datetime.now(timezone.utc).astimezone(_IL)
-    minutes = now_il.hour * 60 + now_il.minute
-    start = 10 * 60       # 10:00 Israel = 07:00 UTC
-    end   = 20 * 60       # 20:00 Israel = 17:00 UTC
-    if start <= minutes <= end:
+    now_utc = datetime.now(timezone.utc)
+    hour_utc = now_utc.hour
+    if 7 <= hour_utc < 22:
         return None
-    return "Gold alerts paused outside London/NY session (10:00-20:00 Israel)"
+    return "Gold alerts paused outside London/NY session (07:00-22:00 UTC)"
 
 
-def _gold_quality_suppression_reason(symbol: str, signal, df, pressure, atr: float = 0) -> str | None:
+def _ema_bias(df) -> str:
+    """EMA 20/50 trend direction — used for 4H confirmation gate."""
+    if df is None or len(df) < 50:
+        return "NEUTRAL"
+    ema20 = df["close"].ewm(span=20, adjust=False).mean().iloc[-1]
+    ema50 = df["close"].ewm(span=50, adjust=False).mean().iloc[-1]
+    if ema20 > ema50:
+        return "BULLISH"
+    if ema20 < ema50:
+        return "BEARISH"
+    return "NEUTRAL"
+
+
+def _gold_quality_suppression_reason(
+    symbol: str, signal, df, pressure, atr: float = 0,
+    df_4h=None, df_daily=None,
+) -> str | None:
     """Extra conservative filters for Gold alerts."""
     if symbol.upper() not in {"XAUUSD", "GOLD"} or signal.direction not in ("BUY", "SELL"):
         return None
@@ -69,12 +83,11 @@ def _gold_quality_suppression_reason(symbol: str, signal, df, pressure, atr: flo
         return "Gold requires enough closed candles"
 
     last = df.iloc[-1]
-    pip = get_pip_size(symbol)
 
     # Candle conviction: reject doji/indecision candles
     candle_range = abs(float(last["high"]) - float(last["low"]))
     body = abs(float(last["close"]) - float(last["open"]))
-    if candle_range > 0 and body / candle_range < 0.30:
+    if candle_range > 0 and body / candle_range < 0.35:
         return f"Gold entry rejected: indecision candle (body {body/candle_range:.0%} of range)"
 
     # Price vs EMA 21: close must be on the right side of the trend
@@ -87,20 +100,45 @@ def _gold_quality_suppression_reason(symbol: str, signal, df, pressure, atr: flo
             return "Gold entry rejected: price above EMA 21 on SELL signal"
 
     # Volume: reject low-participation fake breakouts
-    if "volume" in df.columns:
+    adx_now = float(last.get("adx", 0) or 0)
+    if "volume" in df.columns and adx_now < 40:
         vol = float(last.get("volume", 0) or 0)
         avg_vol = float(df["volume"].tail(20).mean() or 0)
-        if avg_vol > 0 and vol < avg_vol * 0.5:
-            return "Gold entry rejected: low volume (below 50% of 20-bar average)"
+        if avg_vol > 0 and vol < avg_vol * 0.6:
+            return "Gold entry rejected: low volume (below 60% of 20-bar average)"
+
+    # 4H trend gate: 1H and 4H must not contradict each other.
+    # After a big drop the 1H EMA stays bearish for hours into the recovery —
+    # 4H catches the flip earlier and blocks premature SELL re-entries.
+    if df_4h is not None and len(df_4h) >= 50:
+        bias_4h = _ema_bias(df_4h)
+        if signal.direction == "SELL" and bias_4h == "BULLISH":
+            return "Gold entry rejected: 4H trend is bullish, 1H SELL not confirmed"
+        if signal.direction == "BUY" and bias_4h == "BEARISH":
+            return "Gold entry rejected: 4H trend is bearish, 1H BUY not confirmed"
+
+    # ADR exhaustion: if today's session has already consumed 88%+ of the
+    # 10-day average daily range, institutional pressure is likely spent.
+    # Block trend-continuation entries — mean-reversion probability is high.
+    if df_daily is not None and len(df_daily) >= 12:
+        completed = df_daily.iloc[:-1].tail(10)
+        adr_10 = float((completed["high"] - completed["low"]).mean())
+        today = df_daily.iloc[-1]
+        today_range = float(today["high"]) - float(today["low"])
+        if adr_10 > 0 and today_range / adr_10 >= 0.88:
+            return (
+                f"Gold entry rejected: daily range exhausted "
+                f"({today_range:.0f}pts vs ADR {adr_10:.0f}pts)"
+            )
 
     return None
 
 
 def _swing_sl_distance(direction: str, df) -> float | None:
     """Distance from last close to the nearest swing high/low over 8 candles."""
-    if df is None or len(df) < 8:
+    if df is None or len(df) < 5:
         return None
-    recent = df.iloc[-8:]
+    recent = df.iloc[-5:]
     close = float(df.iloc[-1]["close"])
     if direction == "BUY":
         return close - float(recent["low"].min())
@@ -137,7 +175,17 @@ async def scan_symbol(symbol: str) -> dict | None:
 
         df     = await _fetch(ticker, profile["entry_timeframe"])
         df_htf = await _fetch(ticker, profile["htf_timeframe"], lookback=300)
-        df     = compute_all(df, cfg_inst)
+
+        # Gold: fetch 4H and daily for extra quality gates (4H trend + ADR exhaustion)
+        df_4h = None
+        df_daily = None
+        if symbol.upper() in {"XAUUSD", "GOLD"}:
+            df_4h, df_daily = await asyncio.gather(
+                _fetch(ticker, "4h", lookback=200),
+                _fetch(ticker, "1d", lookback=30),
+            )
+
+        df = compute_all(df, cfg_inst)
 
         signal = generate_signal(
             df,
@@ -155,7 +203,10 @@ async def scan_symbol(symbol: str) -> dict | None:
         apply_gold_momentum(symbol, signal, pressure)
 
         if signal.direction in ("BUY", "SELL") and should_block_by_pressure(symbol, signal, pressure):
-            signal.reason = f"{signal.direction} blocked: {pressure.reason}"
+            if signal.is_counter_trend and symbol.upper() in {"XAUUSD", "GOLD"}:
+                signal.reason = f"{signal.direction} blocked: counter-trend to {signal.htf_bias.lower()} 1H bias"
+            else:
+                signal.reason = f"{signal.direction} blocked: {pressure.reason}"
             signal.direction = "HOLD"
 
         atr   = float(df.iloc[-1].get("atr", 0) or 0)
@@ -175,7 +226,7 @@ async def scan_symbol(symbol: str) -> dict | None:
                     "display_name":    get_display_name(symbol),
                 }
 
-            quality_reason = _gold_quality_suppression_reason(symbol, signal, df, pressure, atr=atr)
+            quality_reason = _gold_quality_suppression_reason(symbol, signal, df, pressure, atr=atr, df_4h=df_4h, df_daily=df_daily)
             if quality_reason:
                 signal.reason = f"{signal.direction} blocked: {quality_reason}"
                 signal.direction = "HOLD"
@@ -194,7 +245,7 @@ async def scan_symbol(symbol: str) -> dict | None:
                 if swing_dist is not None:
                     pip = get_pip_size(symbol)
                     risk_temp = _risk_config_for_signal(symbol, signal)
-                    sl_max_pts = float(risk_temp.get("sl_max", 10)) * 2
+                    sl_max_pts = float(risk_temp.get("sl_max", 10)) * 1.8
                     swing_pts = swing_dist / pip
                     if swing_pts > sl_max_pts:
                         signal.reason = f"{signal.direction} blocked: structure SL {swing_pts:.1f}pts (max {sl_max_pts:.0f}pts)"

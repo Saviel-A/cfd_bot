@@ -12,9 +12,9 @@ You are operating as a professional CFD signal bot developer with deep knowledge
 ## Bot Architecture
 
 - **Entry timeframe**: 15M candles (XAUUSD uses `GC=F` via yfinance)
-- **HTF trend filter**: 1H EMA 50/200 (bias = BULLISH / BEARISH / NEUTRAL)
+- **HTF trend filter**: 1H EMA **20/50** (bias = BULLISH / BEARISH / NEUTRAL) — EMA 50/200 was 8-day lag, too slow for intraday gold
 - **Signal engine**: 4 indicators vote +1/−1/0, need **3/4 aligned** with HTF bias
-- **SL**: 0.5×ATR, clamped to **7–10 pts** (1 pt = $1 for gold)
+- **SL**: **0.75×ATR**, clamped to **7–10 pts** (1 pt = $1 for gold) — 0.5×ATR always floored to 7pt minimum which is stop-hunt territory when ATR≈11
 - **TP**: SL × 2.0 (2:1 minimum risk-reward — confirmed best practice for gold)
 - **Session**: Alerts only **10:00–20:00 Israel time** (= London + NY overlap)
 - **Counter-trend**: Gold counter-trend signals are **fully blocked** (pressure check)
@@ -38,8 +38,8 @@ You are operating as a professional CFD signal bot developer with deep knowledge
 
 1. **3/4 indicator confluence** — minimum signal strength
 2. **ADX ≥ 20** — market must be trending, not ranging
-3. **Candle body ≥ 35% of candle range** — rejects doji/indecision candles; only fire on conviction candles (bullish/bearish engulfing style)
-4. **Volume ≥ 60% of 20-bar average** — rejects low-participation fake breakouts; gold futures volume (GC=F) is reliable during London/NY
+3. **Candle body ≥ 35% of candle range** — rejects doji/indecision candles; only fire on conviction candles (bullish/bearish engulfing style). Code threshold: `body / range < 0.35`
+4. **Volume ≥ 60% of 20-bar average** — rejects low-participation fake breakouts; gold futures volume (GC=F) is reliable during London/NY. Code threshold: `vol < avg_vol * 0.6`
 5. **Swing SL gate**: compute distance from last close to swing high/low over last 8 candles; if that distance > 10 pts, **block** (market structure requires too wide a stop)
 6. **Session filter**: London + NY only (10:00–20:00 Israel); Asian session has negative expectancy on gold
 7. **Pressure alignment**: `buy_pct ≥ 55%` for BUY, `sell_pct ≥ 55%` for SELL; strong opposite pressure (`≥ 60%`) always blocks
@@ -51,7 +51,7 @@ You are operating as a professional CFD signal bot developer with deep knowledge
 
 ## Stop Loss Placement (Professional Rules)
 
-- **Base**: `0.5 × ATR(14)`, floor 7 pts, ceiling 10 pts
+- **Base**: `0.75 × ATR(14)`, floor 7 pts, ceiling 10 pts
 - **Structure gate**: if nearest swing high (SELL) or swing low (BUY) over last 8 candles is > 10 pts away → skip the trade entirely (structure risk is too high)
 - **Never widen SL** after entry — predefine and automate
 - SL for gold is placed at a structural level, not just a fixed distance
