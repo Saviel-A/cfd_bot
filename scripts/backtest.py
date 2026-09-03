@@ -46,10 +46,18 @@ YF_TICKERS = {
 
 DEFAULT_SYMBOLS = ["XAUUSD", "EURUSD", "GBPUSD", "USDJPY", "NAS100", "BTCUSD"]
 
+# Per-symbol replay profiles, mirroring signal_profiles.py: gold trades
+# 15m entries against a 1H bias (yfinance caps 15m history at ~60 days);
+# everything else runs 1H against 4H.
+PROFILES = {
+    "XAUUSD": {"interval": "15m", "period": "59d", "htf": "1h"},
+}
+DEFAULT_PROFILE = {"interval": "1h", "period": "700d", "htf": "4h"}
+
 WARMUP = 210          # candles before the first evaluated signal
 MAX_HOLD = 96         # give a trade at most 96 entry-candles to resolve
 import os
-SETTINGS = {"signals": {"min_confluence": int(os.getenv("MIN_CONF", "3")), "indicators": {}}}
+SETTINGS = {"signals": {"min_confluence": int(os.getenv("MIN_CONF", "4")), "indicators": {}}}
 INSTRUMENT_CFG: dict = {}
 RISK_V2 = {"sl_atr_multiplier": 1.5, "rr1": 2.0, "sl_min": 5, "sl_max": 16}
 RISK_LEGACY = {"sl_atr_multiplier": 1.5, "rr1": 2.0, "sl_min": 12, "sl_max": 16}
@@ -134,7 +142,14 @@ def simulate(df: pd.DataFrame, i: int, direction: str, symbol: str, risk_cfg: di
 
 def run_symbol(symbol: str) -> tuple[Stats, Stats]:
     ticker = YF_TICKERS.get(symbol, symbol)
-    raw = yf.download(ticker, period="700d", interval="1h", progress=False, auto_adjust=True)
+    profile = PROFILES.get(symbol.upper(), DEFAULT_PROFILE)
+    raw = yf.download(
+        ticker,
+        period=profile["period"],
+        interval=profile["interval"],
+        progress=False,
+        auto_adjust=True,
+    )
     if raw is None or raw.empty:
         raise RuntimeError(f"no data for {symbol} ({ticker})")
     if isinstance(raw.columns, pd.MultiIndex):
@@ -143,7 +158,7 @@ def run_symbol(symbol: str) -> tuple[Stats, Stats]:
         raw.columns = [c.lower() for c in raw.columns]
     df = compute_all(raw, INSTRUMENT_CFG)
 
-    htf_raw = raw.resample("4h").agg(
+    htf_raw = raw.resample(profile["htf"]).agg(
         {"open": "first", "high": "max", "low": "min", "close": "last"}
     ).dropna()
 
