@@ -23,8 +23,11 @@ were an artifact, and against the HTF trend the odds were worst of all.
 Flow:
   1. HTF bias (EMA 20/50) → bullish / bearish / neutral
   2. Four orthogonal factors vote (+1 / -1 / 0)
-  3. Must reach min_confluence with the HTF trend, never against it
-  4. Extension block overrides everything
+  3. Trend and Location are CORE: both must agree with the direction -
+     every entry is trend-aligned and taken at value, no exceptions
+  4. Must also reach min_confluence overall (default 3: core pair plus
+     at least one of Momentum / RSI zone)
+  5. Extension block overrides everything
 """
 
 from dataclasses import dataclass, field
@@ -137,6 +140,8 @@ def generate_signal(
 
     bull_count = sum(1 for v in votes.values() if v == 1)
     bear_count = sum(1 for v in votes.values() if v == -1)
+    core_bull = votes["Trend"] == 1 and votes["Location"] == 1
+    core_bear = votes["Trend"] == -1 and votes["Location"] == -1
 
     raw_dir = "HOLD"
     strength = max(bull_count, bear_count)
@@ -144,7 +149,7 @@ def generate_signal(
 
     if htf_bias == "NEUTRAL":
         reason = f"{htf_label} trend is neutral"
-    elif htf_bias == "BULLISH" and bull_count >= min_confluence:
+    elif htf_bias == "BULLISH" and core_bull and bull_count >= min_confluence:
         if dist > EXTENSION_BLOCK_ATR:
             reason = (
                 f"BUY blocked: price is {dist:.1f} ATR above value. "
@@ -154,7 +159,7 @@ def generate_signal(
             raw_dir = "BUY"
             strength = bull_count
             reason = f"{htf_label} bullish trend + {entry_label} confluence at value"
-    elif htf_bias == "BEARISH" and bear_count >= min_confluence:
+    elif htf_bias == "BEARISH" and core_bear and bear_count >= min_confluence:
         if dist < -EXTENSION_BLOCK_ATR:
             reason = (
                 f"SELL blocked: price is {abs(dist):.1f} ATR below value. "

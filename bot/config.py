@@ -23,7 +23,7 @@ class Config:
     # Strategy (hardcoded)
     DEFAULT_TIMEFRAME: str   = "1h"
     HTF_TIMEFRAME: str       = "4h"
-    MIN_CONFLUENCE: int      = int(os.getenv("MIN_CONFLUENCE", "4"))  # of 4 orthogonal factors; 4 = highest-conviction only
+    MIN_CONFLUENCE: int      = int(os.getenv("MIN_CONFLUENCE", "3"))  # Trend+Location always required; 3 = plus one confirm (~5 gold signals/day), 4 = highest conviction (~1/day)
     SL_ATR_MULTIPLIER: float = float(os.getenv("SL_ATR_MULTIPLIER", "0.5"))
     SL_MIN: float            = float(os.getenv("SL_MIN", "7.0"))
     SL_MAX: float            = float(os.getenv("SL_MAX", "10.0"))

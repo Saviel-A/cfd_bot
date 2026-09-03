@@ -59,7 +59,7 @@ MAX_HOLD = 96         # give a trade at most 96 entry-candles to resolve
 import os
 SETTINGS = {"signals": {"min_confluence": int(os.getenv("MIN_CONF", "4")), "indicators": {}}}
 INSTRUMENT_CFG: dict = {}
-RISK_V2 = {"sl_atr_multiplier": 1.5, "rr1": 2.0, "sl_min": 5, "sl_max": 16}
+RISK_V2 = {"sl_atr_multiplier": 1.5, "rr1": float(os.getenv("RR", "2.0")), "sl_min": 5, "sl_max": 16}
 RISK_LEGACY = {"sl_atr_multiplier": 1.5, "rr1": 2.0, "sl_min": 12, "sl_max": 16}
 
 
