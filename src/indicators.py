@@ -104,6 +104,24 @@ def add_atr(df: pd.DataFrame, period: int = 14) -> pd.DataFrame:
     return df
 
 
+def add_derived(df: pd.DataFrame, ema_slow: int) -> pd.DataFrame:
+    """Columns the confluence engine reads that are combinations of the
+    base indicators: how extended price is from value (in ATRs) and
+    whether MACD momentum is building or fading."""
+    df = df.copy()
+    ema_col = f"ema_{ema_slow}"
+    if ema_col in df.columns and "atr" in df.columns:
+        df["ema_dist_atr"] = (df["close"] - df[ema_col]) / df["atr"].replace(0, np.nan)
+        df["ema_dist_atr"] = df["ema_dist_atr"].fillna(0)
+    else:
+        df["ema_dist_atr"] = 0.0
+    if "macd_hist" in df.columns:
+        df["macd_hist_rising"] = (df["macd_hist"] > df["macd_hist"].shift(1)).map({True: 1, False: -1})
+    else:
+        df["macd_hist_rising"] = 0
+    return df
+
+
 def compute_all(df: pd.DataFrame, instrument_cfg: dict) -> pd.DataFrame:
     df = add_ema(
         df,
@@ -135,4 +153,5 @@ def compute_all(df: pd.DataFrame, instrument_cfg: dict) -> pd.DataFrame:
         df,
         period=instrument_cfg.get("adx", {}).get("period", 14),
     )
+    df = add_derived(df, ema_slow=instrument_cfg.get("ema", {}).get("slow", 21))
     return df

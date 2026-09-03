@@ -80,14 +80,19 @@ def calculate_trade(
 
     sl_dist = atr * sl_mult
 
-    # Clamp SL distance between sl_min and sl_max pips if configured.
+    # The stop must live outside normal candle noise, whatever the
+    # instrument or the day: floor at 0.9 ATR, and any configured pip
+    # cap only applies once it is at least 1.3 ATR wide. A fixed pip
+    # cap that lands inside the noise band loses on both directions.
     pip_size = get_pip_size(symbol)
     sl_min = risk_cfg.get("sl_min")
     sl_max = risk_cfg.get("sl_max")
+    sl_dist = max(sl_dist, 0.9 * atr)
     if sl_min is not None:
         sl_dist = max(sl_dist, float(sl_min) * pip_size)
     if sl_max is not None:
-        sl_dist = min(sl_dist, float(sl_max) * pip_size)
+        cap = max(float(sl_max) * pip_size, 1.3 * atr)
+        sl_dist = min(sl_dist, cap)
     risk_amount = balance * (risk_pct / 100)
     position_size = risk_amount / sl_dist if sl_dist > 0 else 0
 
