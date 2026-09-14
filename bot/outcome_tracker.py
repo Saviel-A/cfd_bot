@@ -90,6 +90,7 @@ async def run_outcome_tracker(bot, interval_seconds: int = CHECK_INTERVAL_SECOND
                 open_signals = await get_open_signals(session)
 
             if not open_signals:
+                await asyncio.sleep(interval_seconds)
                 continue
 
             logger.info(f"Checking {len(open_signals)} open signals")

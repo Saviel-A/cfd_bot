@@ -14,7 +14,7 @@ You are operating as a professional CFD signal bot developer with deep knowledge
 - **Entry timeframe**: 15M candles (XAUUSD uses `GC=F` via yfinance)
 - **HTF trend filter**: 1H EMA **20/50** (bias = BULLISH / BEARISH / NEUTRAL) — EMA 50/200 was 8-day lag, too slow for intraday gold
 - **Signal engine**: 4 indicators vote +1/−1/0, need **3/4 aligned** with HTF bias
-- **SL**: **0.75×ATR**, clamped to **7–10 pts** (1 pt = $1 for gold) — 0.5×ATR always floored to 7pt minimum which is stop-hunt territory when ATR≈11
+- **SL**: **1.3×ATR**, clamped to **12–16 pts** (1 pt = $1 for gold) — a sub-ATR stop (gold 15M ATR≈11) sits inside normal noise and gets hit ~50% even when direction is right. Dollar risk is controlled by POSITION SIZE (risk_manager sizes lots from risk_amount/sl_dist), NOT by tightening the stop. Wider stop + smaller lot = same $ risk, far fewer noise stop-outs.
 - **TP**: SL × 2.0 (2:1 minimum risk-reward — confirmed best practice for gold)
 - **Session**: Alerts only **10:00–20:00 Israel time** (= London + NY overlap)
 - **Counter-trend**: Gold counter-trend signals are **fully blocked** (pressure check)
