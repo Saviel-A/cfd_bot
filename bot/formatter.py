@@ -1,5 +1,7 @@
 """Telegram message formatter."""
 
+import html
+
 from src.signal_engine import Signal
 from src.risk_manager import TradeParams
 from src.trading_hours import symbol_market_status
@@ -36,7 +38,7 @@ def _vote_label(value: int) -> str:
 def _format_reason(reason: str) -> str:
     if not reason:
         return "No clean setup"
-    clean = reason.strip()
+    clean = html.escape(reason.strip())
     replacements = {
         "BUY blocked: counter-trend to 4H bearish bias": "Buy blocked: 4H trend is bearish",
         "SELL blocked: counter-trend to 4H bullish bias": "Sell blocked: 4H trend is bullish",

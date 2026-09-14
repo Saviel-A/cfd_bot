@@ -5,6 +5,7 @@ Telegram handlers.
 """
 
 import asyncio
+import html
 import logging
 from datetime import datetime, timezone, timedelta
 
@@ -920,7 +921,10 @@ async def cmd_signal(message: Message):
         except Exception:
             await msg.edit_text(text, parse_mode="HTML", reply_markup=_menu_markup())
     except Exception as e:
-        await msg.edit_text(f"❌ <b>Scan Failed</b>\n\nSymbol: <b>{symbol}</b>\nReason: <code>{e}</code>", parse_mode="HTML", reply_markup=_menu_markup())
+        try:
+            await msg.edit_text(f"❌ <b>Scan Failed</b>\n\nSymbol: <b>{symbol}</b>\nReason: <code>{html.escape(str(e))}</code>", parse_mode="HTML", reply_markup=_menu_markup())
+        except Exception:
+            await message.answer(f"❌ <b>Scan Failed</b>\n\nSymbol: <b>{symbol}</b>\nReason: <code>{html.escape(str(e))}</code>", parse_mode="HTML", reply_markup=_menu_markup())
 
 
 @router.callback_query(F.data.startswith("scan_sym:"))
@@ -974,7 +978,10 @@ async def cb_scan_symbol(callback: CallbackQuery):
         except Exception:
             await callback.message.edit_text(text, parse_mode="HTML", reply_markup=_menu_markup())
     except Exception as e:
-        await callback.message.edit_text(f"❌ <b>Scan Failed</b>\n\nSymbol: <b>{symbol}</b>\nReason: <code>{e}</code>", parse_mode="HTML", reply_markup=_menu_markup())
+        try:
+            await callback.message.edit_text(f"❌ <b>Scan Failed</b>\n\nSymbol: <b>{symbol}</b>\nReason: <code>{html.escape(str(e))}</code>", parse_mode="HTML", reply_markup=_menu_markup())
+        except Exception:
+            await callback.message.answer(f"❌ <b>Scan Failed</b>\n\nSymbol: <b>{symbol}</b>\nReason: <code>{html.escape(str(e))}</code>", parse_mode="HTML", reply_markup=_menu_markup())
 
 
 # /market
