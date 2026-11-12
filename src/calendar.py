@@ -104,52 +104,6 @@ def get_calendar(today_only: bool = True) -> list[dict]:
     return results
 
 
-def format_calendar_message(events: list, today_only: bool = True) -> str:
-    now_il       = datetime.now(IL)
-    tz           = f"UTC+{int(now_il.utcoffset().total_seconds()//3600)}"
-    period       = "Today" if today_only else "This Week"
-    current_time = now_il.strftime("%H:%M")
-
-    if not events:
-        return (
-            f"📅 <b>Economic Calendar</b>\n"
-            f"{period} | Israel time ({tz})\n\n"
-            "No high/medium impact events."
-        )
-
-    upcoming = [e for e in events if e["time_il"] >= current_time]
-    past     = [e for e in events if e["time_il"] <  current_time]
-
-    def _fmt_event(ev: dict, done: bool) -> str:
-        icon     = _IMPACT_ICON.get(ev["impact"], "⚪")
-        forecast = f"\nForecast: <code>{ev['forecast']}</code>" if ev["forecast"] else ""
-        prev     = f"\nPrevious: <code>{ev['previous']}</code>" if ev["previous"] else ""
-        check    = "✅ " if done else ""
-        return (
-            f"{check}{icon} <code>{ev['time_il']}</code>  <b>{ev['currency']}</b>\n"
-            f"{ev['title']}{forecast}{prev}"
-        )
-
-    lines = ["📅 <b>Economic Calendar</b>", f"{period} | Israel time ({tz})", ""]
-
-    if upcoming:
-        lines.append("<b>Upcoming</b>")
-        for ev in upcoming:
-            lines.append(_fmt_event(ev, done=False))
-
-    if upcoming and past:
-        lines.append("")
-
-    if past:
-        lines.append("<b>Past</b>")
-        for ev in past:
-            lines.append(_fmt_event(ev, done=True))
-
-    lines.append("")
-    lines.append(f"🔴 High  🟡 Medium  {now_il.strftime('%d %B  %H:%M Israel time')}")
-    return "\n".join(lines)
-
-
 def check_news_risk(symbol: str) -> tuple[str, list[dict]]:
     """
     Check if a high-impact news event is near for this symbol's currencies.

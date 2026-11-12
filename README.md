@@ -72,16 +72,13 @@ The bot sends a startup message to the owner on launch.
 | `/help` | Show Commands |
 | `/signal XAUUSD` | Check Signal |
 | `/scan` | Scan Channel |
-| `/chart XAUUSD` | Chart |
 | `/stats` | Stats |
+| `/postmortem` | Results by symbol, session and factor |
 | `/history` | Recent Alerts |
 | `/watchlist` | Watchlist |
 | `/symbols` | Instruments |
 | `/add XAUUSD` | Add Symbol |
 | `/remove XAUUSD` | Remove Symbol |
-| `/market` | News |
-| `/calendar` | Calendar |
-| `/hours` | Market Hours |
 | `/users` | Subscribers |
 | `/approve` | Invite Subscriber |
 

@@ -50,13 +50,11 @@ cfd_bot/
 │       ├── session.py
 │       ├── models/
 │       │   ├── user.py          # User, premium_until
-│       │   ├── settings.py      # UserSettings (created per user, not actively read)
 │       │   ├── watchlist.py     # UserWatchlist
 │       │   └── signal.py        # Signal history
 │       └── repositories/
 │           ├── user_repo.py
 │           ├── watchlist_repo.py
-│           ├── settings_repo.py
 │           └── signal_repo.py
 │
 └── src/
@@ -69,9 +67,8 @@ cfd_bot/
     ├── regime.py                # Market regime: Hurst exponent, volatility percentile, ADX
     ├── data_quality.py          # Candle feed sanity checks before a signal is trusted
     ├── postmortem.py            # Closed-signal breakdown in R + Kelly risk suggestion (/postmortem)
-    ├── trading_hours.py         # Market session hours (Israel time)
-    ├── calendar.py              # Forex Factory economic calendar
-    └── news.py                  # yfinance news fetcher
+    ├── trading_hours.py         # Market open/closed status per symbol
+    └── calendar.py              # Forex Factory calendar: blocks alerts around high-impact news
 ```
 
 ## Bot Commands
@@ -84,9 +81,10 @@ cfd_bot/
 | `/add SYMBOL` | Add symbol to watchlist |
 | `/remove SYMBOL` | Remove symbol |
 | `/signal SYMBOL` | On-demand signal |
-| `/market` | News + economic calendar |
-| `/hours` | Market session times (Israel) |
 | `/history` | Last 20 signals |
+| `/stats` | Win rate and results |
+| `/postmortem` | Results in R by symbol, session and factor |
+| `/scan` | Scan the watchlist now |
 | `/symbols` | Browse all 80+ instruments |
 | `/users` | List users who messaged the bot |
 | `/approve ID` | Send channel invite to a user |

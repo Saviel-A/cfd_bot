@@ -102,33 +102,3 @@ def symbol_market_status(symbol: str) -> tuple[bool, str]:
         else f"🔴 Market Closed. Israel time: {now_il.strftime('%H:%M')}"
     )
     return open_, label
-
-
-def get_hours_message() -> str:
-    now_utc = _now_utc()
-    now_il  = datetime.now(IL)
-    offset  = int(now_il.utcoffset().total_seconds() // 3600)
-    tz      = f"UTC+{offset}"
-
-    markets = [
-        ("forex",  "💱",  "Metals, Forex and Energy",
-            "Mon-Fri, daily break 23:00-00:00"),
-        ("crypto", "₿",   "Crypto",
-            "24/7, no break"),
-        ("us",     "🇺🇸", "US Indices and Stocks",
-            f"Mon-Fri, {_to_il(13,30)}-{_to_il(20,0)}"),
-        ("eu",     "🇪🇺", "European Indices",
-            f"Mon-Fri, {_to_il(7,0)}-{_to_il(15,30)}"),
-        ("asia",   "🌏",  "Asian Indices",
-            f"Mon-Fri, {_to_il(0,0)}-{_to_il(6,0)}"),
-    ]
-
-    lines = ["🕐 <b>Market Hours</b>", f"Israel time ({tz})", ""]
-
-    for key, icon, name, hours in markets:
-        dot = "🟢" if _is_open(key, now_utc) else "🔴"
-        lines.append(f"{dot} {icon} <b>{name}</b>: {hours}")
-
-    lines.append("")
-    lines.append(now_il.strftime("Updated: %H:%M"))
-    return "\n".join(lines)

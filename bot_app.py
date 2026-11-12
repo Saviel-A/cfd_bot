@@ -58,7 +58,6 @@ async def main():
         BotCommand(command="help", description="Show Commands"),
         BotCommand(command="signal", description="Check Signal"),
         BotCommand(command="scan", description="Scan Channel"),
-        BotCommand(command="chart", description="Chart"),
         BotCommand(command="stats", description="Stats"),
         BotCommand(command="postmortem", description="Edge Breakdown"),
         BotCommand(command="history", description="Recent Alerts"),
@@ -66,9 +65,6 @@ async def main():
         BotCommand(command="symbols", description="Instruments"),
         BotCommand(command="add", description="Add Symbol"),
         BotCommand(command="remove", description="Remove Symbol"),
-        BotCommand(command="market", description="News"),
-        BotCommand(command="calendar", description="Calendar"),
-        BotCommand(command="hours", description="Market Hours"),
         BotCommand(command="users", description="Subscribers"),
         BotCommand(command="approve", description="Invite Subscriber"),
     ]
