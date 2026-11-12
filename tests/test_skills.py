@@ -287,3 +287,72 @@ def test_reads_plain_csv_and_reports_missing_files(tmp_path):
     assert list(df["close"]) == [1.15, 1.2]
     assert find_history_file(tmp_path, "GBPUSD") is None
     assert find_history_file(tmp_path / "nope", "EURUSD") is None
+
+
+# Twelve Data gold source
+
+TD_PAYLOAD = {
+    "meta": {"symbol": "XAU/USD", "interval": "15min"},
+    "status": "ok",
+    "values": [   # newest first, as the API returns them
+        {"datetime": "2026-01-05 10:30:00", "open": "2003", "high": "2006", "low": "2002", "close": "2005"},
+        {"datetime": "2026-01-05 10:15:00", "open": "2001", "high": "2004", "low": "2000", "close": "2003"},
+        {"datetime": "2026-01-05 10:00:00", "open": "2000", "high": "2002", "low": "1999", "close": "2001"},
+    ],
+}
+
+
+def test_twelvedata_parses_oldest_first_in_utc():
+    from src.twelvedata import parse_time_series
+
+    df = parse_time_series(TD_PAYLOAD)
+    assert list(df["close"]) == [2001, 2003, 2005]
+    assert str(df.index.tz) == "UTC"
+    assert df["volume"].sum() == 0
+
+
+def test_twelvedata_reports_api_errors():
+    import pytest
+    from src.twelvedata import parse_time_series
+
+    with pytest.raises(ValueError, match="apikey"):
+        parse_time_series({"status": "error", "message": "apikey is incorrect"})
+
+
+def test_twelvedata_only_used_for_gold_with_a_key(monkeypatch):
+    from src import twelvedata
+
+    monkeypatch.delenv("TWELVE_DATA_API_KEY", raising=False)
+    assert not twelvedata.supports("GC=F", "15m")
+    monkeypatch.setenv("TWELVE_DATA_API_KEY", "k")
+    assert twelvedata.supports("GC=F", "15m")
+    assert not twelvedata.supports("EURUSD=X", "1h")
+
+
+def _old_candles(n=40):
+    index = pd.date_range("2026-01-05", periods=n, freq="15min", tz="UTC")
+    return pd.DataFrame({"open": 1.0, "high": 2.0, "low": 0.5, "close": 1.5, "volume": 0.0}, index=index)
+
+
+def test_gold_uses_twelvedata_and_falls_back_to_yahoo(monkeypatch):
+    from src import data_fetcher, twelvedata
+
+    monkeypatch.setenv("TWELVE_DATA_API_KEY", "k")
+    yahoo = _old_candles(30)
+    monkeypatch.setattr(data_fetcher, "_yahoo_candles", lambda ticker, timeframe: yahoo)
+
+    asked = {}
+    def spot(ticker, timeframe, bars):
+        asked["bars"] = bars
+        return _old_candles(40)
+    monkeypatch.setattr(twelvedata, "fetch_candles", spot)
+    assert len(data_fetcher.fetch_ohlcv("GC=F", "15m", lookback=35)) == 35
+    assert asked["bars"] == 40
+
+    def broken(ticker, timeframe, bars):
+        raise RuntimeError("rate limit")
+    monkeypatch.setattr(twelvedata, "fetch_candles", broken)
+    assert len(data_fetcher.fetch_ohlcv("GC=F", "15m", lookback=35)) == 30
+
+    # Other symbols never touch Twelve Data.
+    assert len(data_fetcher.fetch_ohlcv("EURUSD=X", "15m", lookback=35)) == 30

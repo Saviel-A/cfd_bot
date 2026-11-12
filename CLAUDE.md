@@ -27,7 +27,7 @@ Broadcast to private Telegram channel
 | Database | PostgreSQL (Supabase) |
 | ORM | SQLAlchemy 2.0 async |
 | DB driver | asyncpg |
-| Market data | yfinance |
+| Market data | yfinance; Twelve Data for spot gold (optional key) |
 | Config | python-dotenv |
 
 ## Project Structure
@@ -41,7 +41,7 @@ cfd_bot/
 ├── bot/
 │   ├── config.py                # Deployment config (.env) + hardcoded strategy constants
 │   ├── handlers.py              # All Telegram handlers and callbacks
-│   ├── admin.py                 # /users and /approve (owner only)
+│   ├── admin.py                 # /users (owner only)
 │   ├── scanner.py               # Scan loop — runs every N minutes
 │   ├── outcome_tracker.py       # Checks open signals for TP/SL hits every 15m
 │   ├── formatter.py             # Message formatting
@@ -59,7 +59,8 @@ cfd_bot/
 │
 └── src/
     ├── instruments.py           # Symbol registry + ticker mapping
-    ├── data_fetcher.py          # yfinance OHLCV downloader
+    ├── data_fetcher.py          # yfinance OHLCV downloader (gold from Twelve Data when a key is set)
+    ├── twelvedata.py            # Spot XAU/USD candles from Twelve Data
     ├── indicators.py            # EMA, RSI, MACD, Bollinger, ATR
     ├── signal_engine.py         # Multi-timeframe confluence logic
     ├── risk_manager.py          # ATR-based SL/TP calculation
@@ -82,13 +83,11 @@ cfd_bot/
 | `/add SYMBOL` | Add symbol to watchlist |
 | `/remove SYMBOL` | Remove symbol |
 | `/signal SYMBOL` | On-demand signal |
-| `/history` | Last 20 signals |
-| `/stats` | Win rate and results |
-| `/postmortem` | Results in R by symbol, session and factor |
+| `/stats` | Win rate and results, with buttons for the breakdown in R and recent alerts |
 | `/scan` | Scan the watchlist now |
-| `/symbols` | Browse all 80+ instruments |
-| `/users` | List users who messaged the bot |
-| `/approve ID` | Send channel invite to a user |
+| `/users` | Subscribers: invite, kick, delete |
+
+The main menu also has buttons for the instrument browser (Add Symbol), inviting a subscriber and the share link.
 
 ### Users (non-owner)
 Subscribe via Telegram Stars — receive a single-use channel invite link instantly after payment.
@@ -117,12 +116,12 @@ All logic lives in pure modules under `src/` and is covered by `tests/` (`python
 | Correlation guard | on (`CORRELATION_GUARD`) | Skips an alert that is the same bet as an open trade (1H return correlation of 0.80 or more) |
 | Data quality check | always on | Frozen, missing, inconsistent or bad-tick candles turn the scan into a HOLD |
 | Regime gate | off (`REGIME_GATE`) | Skips entries in range / quiet / shock regimes. It changes which entries fire, so prove it with the backtest first |
-| `/postmortem` | owner command | Win rate and expectancy in R by symbol, direction, confluence, session and factor, plus a quarter-Kelly risk suggestion |
+| Stats > Breakdown | owner button | Win rate and expectancy in R by symbol, direction, confluence, session and factor, plus a quarter-Kelly risk suggestion |
 | `scripts/backtest.py` | manual | Charges a cost per trade (`COST_R`), reports walk-forward periods (`FOLDS`), replays entries with stop/target moved and costs doubled, and prints a pass/fail verdict. `DATA_DIR=<folder>` runs it on MetaTrader 5 bar exports (`XAUUSD.csv`, ...) instead of Yahoo. Can test the regime gate (`REGIME_GATE=1`) and a breakeven stop (`BE_AT_R=1.0`) |
 
 ## Environment Variables (.env)
 
-Only 5 — everything else is hardcoded in config.py:
+5 required, plus optional `TWELVE_DATA_API_KEY` (spot gold candles instead of Yahoo gold futures) and the guard switches in `.env.example`:
 
 ```
 TELEGRAM_BOT_TOKEN=

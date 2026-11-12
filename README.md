@@ -73,14 +73,10 @@ The bot sends a startup message to the owner on launch.
 | `/signal XAUUSD` | Check Signal |
 | `/scan` | Scan Channel |
 | `/stats` | Stats |
-| `/postmortem` | Results by symbol, session and factor |
-| `/history` | Recent Alerts |
 | `/watchlist` | Watchlist |
-| `/symbols` | Instruments |
 | `/add XAUUSD` | Add Symbol |
 | `/remove XAUUSD` | Remove Symbol |
 | `/users` | Subscribers |
-| `/approve` | Invite Subscriber |
 
 ### Subscribers (non-owner)
 

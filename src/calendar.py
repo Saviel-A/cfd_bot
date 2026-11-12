@@ -5,7 +5,7 @@ Shows today's high/medium impact events in Israel time.
 
 import logging
 import requests
-from datetime import datetime, timedelta
+from datetime import datetime
 from zoneinfo import ZoneInfo
 
 logger = logging.getLogger(__name__)
@@ -109,7 +109,7 @@ def check_news_risk(symbol: str) -> tuple[str, list[dict]]:
     Check if a high-impact news event is near for this symbol's currencies.
 
     Returns:
-        ("BLOCK", events)  — HIGH impact within 60 min  → don't send signal
+        ("BLOCK", events)  — HIGH impact in the next 60 min or the last 60 min → don't send signal
         ("WARN",  events)  — HIGH impact within 120 min → send with warning
         ("CLEAR", [])      — no nearby risk
     """
@@ -147,8 +147,9 @@ def check_news_risk(symbol: str) -> tuple[str, list[dict]]:
             continue
         delta = dt_utc - now_utc
         minutes = delta.total_seconds() / 60
-        # Also catch events that just passed (within last 30 min — market still reacting)
-        if -30 <= minutes <= 60:
+        # Also catch events that just passed: the first hour after a
+        # high-impact release is still reaction, not trend.
+        if -60 <= minutes <= 60:
             block_hit.append({"title": ev.get("title",""), "minutes": round(minutes)})
         elif 60 < minutes <= 120:
             warn_hit.append({"title": ev.get("title",""), "minutes": round(minutes)})

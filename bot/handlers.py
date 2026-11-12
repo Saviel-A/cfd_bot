@@ -69,7 +69,6 @@ def _menu_markup_main():
     builder.button(text="📊 Stats",         callback_data="home:stats")
     builder.button(text="📜 Recent Alerts", callback_data="home:history")
     builder.button(text="📋 Watchlist",    callback_data="home:watchlist")
-    builder.button(text="🔎 Instruments",  callback_data="home:symbols")
     builder.button(text="➕ Add Symbol",   callback_data="home:symbols")
     builder.button(text="➖ Remove Symbol", callback_data="home:remove")
     builder.button(text="👥 Subscribers",  callback_data="home:users")
@@ -142,17 +141,13 @@ def _commands_text(name: str) -> str:
         "/signal XAUUSD - Check Signal\n"
         "/scan - Scan Channel\n\n"
         "📊 <b>Stats</b>\n"
-        "/stats - Stats\n"
-        "/postmortem - Where The Edge Comes From\n"
-        "/history - Recent Alerts\n\n"
+        "/stats - Stats, Breakdown, Recent Alerts\n\n"
         "📋 <b>Watchlist</b>\n"
         "/watchlist - Watchlist\n"
-        "/symbols - Instruments\n"
         "/add XAUUSD - Add Symbol\n"
         "/remove XAUUSD - Remove Symbol\n\n"
         "👥 <b>Subscribers</b>\n"
-        "/users - Subscribers\n"
-        "/approve - Invite Subscriber"
+        "/users - Subscribers And Invites"
     )
 
 
@@ -189,6 +184,25 @@ async def _send_closed_symbol_chart(target, symbol: str, edit_message=None):
             await edit_message.edit_text(text, parse_mode="HTML", reply_markup=_menu_markup())
         else:
             await target.answer(text, parse_mode="HTML", reply_markup=_menu_markup())
+
+
+async def _postmortem_text() -> str:
+    """Closed signals broken down in R, for the Stats breakdown button."""
+    async with AsyncSessionLocal() as session:
+        rows = await get_closed_signals(session, limit=500)
+    records = [
+        TradeRecord(
+            symbol=row.symbol,
+            direction=row.direction,
+            outcome=row.outcome,
+            r=trade_r(row.outcome, row.entry_price, row.stop_loss, row.tp),
+            fired_at=row.fired_at,
+            strength=row.confluence_score,
+            votes=row.indicator_votes or {},
+        )
+        for row in rows
+    ]
+    return format_postmortem(build_postmortem(records))
 
 
 # /start & /help
@@ -356,11 +370,21 @@ async def cb_home(callback: CallbackQuery):
         async with AsyncSessionLocal() as session:
             stats = await get_signal_stats(session, limit=100)
         builder = InlineKeyboardBuilder()
+        builder.button(text="🔬 Breakdown", callback_data="home:postmortem")
         builder.button(text="📜 Recent Alerts", callback_data="home:history")
         builder.button(text="🏠 Home", callback_data="home:menu")
         builder.adjust(2)
         await callback.message.edit_text(
             format_stats_message(stats), parse_mode="HTML", reply_markup=builder.as_markup(),
+        )
+
+    elif action == "postmortem":
+        builder = InlineKeyboardBuilder()
+        builder.button(text="📊 Stats", callback_data="home:stats")
+        builder.button(text="🏠 Home", callback_data="home:menu")
+        builder.adjust(2)
+        await callback.message.edit_text(
+            await _postmortem_text(), parse_mode="HTML", reply_markup=builder.as_markup(),
         )
 
     # Subscribers
@@ -927,66 +951,20 @@ async def cb_scan_symbol(callback: CallbackQuery):
             await callback.message.answer(f"❌ <b>Scan Failed</b>\n\nSymbol: <b>{symbol}</b>\nReason: <code>{html.escape(str(e))}</code>", parse_mode="HTML", reply_markup=_menu_markup())
 
 
-# /history - Recent Alerts
-@router.message(Command("history"))
-async def cmd_history(message: Message):
-    if not await _check_owner(message): return
-    parts = message.text.split()
-    limit = int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else 20
-    limit = min(limit, 200)
-    async with AsyncSessionLocal() as session:
-        signals = await get_recent_signals(session, limit=limit)
-    builder = InlineKeyboardBuilder()
-    if limit <= 20:
-        builder.button(text="Show 50",  callback_data="home:history:50")
-    if limit <= 50:
-        builder.button(text="Show 100", callback_data="home:history:100")
-    builder.button(text="🗑 Clear Alerts", callback_data="home:history:clear")
-    builder.button(text="🏠 Home",          callback_data="home:menu")
-    builder.adjust(2)
-    await message.answer(format_history_message(signals, limit=limit), parse_mode="HTML", reply_markup=builder.as_markup())
-
-
+# /stats
 @router.message(Command("stats"))
 async def cmd_stats(message: Message):
     if not await _check_owner(message): return
     async with AsyncSessionLocal() as session:
         stats = await get_signal_stats(session, limit=100)
     builder = InlineKeyboardBuilder()
+    builder.button(text="🔬 Breakdown", callback_data="home:postmortem")
     builder.button(text="📜 Recent Alerts", callback_data="home:history")
     builder.button(text="🏠 Home", callback_data="home:menu")
     builder.adjust(2)
     await message.answer(format_stats_message(stats), parse_mode="HTML", reply_markup=builder.as_markup())
 
 
-
-
-# /postmortem - breakdown of closed signals in R
-@router.message(Command("postmortem"))
-async def cmd_postmortem(message: Message):
-    if not await _check_owner(message): return
-    async with AsyncSessionLocal() as session:
-        rows = await get_closed_signals(session, limit=500)
-    records = [
-        TradeRecord(
-            symbol=row.symbol,
-            direction=row.direction,
-            outcome=row.outcome,
-            r=trade_r(row.outcome, row.entry_price, row.stop_loss, row.tp),
-            fired_at=row.fired_at,
-            strength=row.confluence_score,
-            votes=row.indicator_votes or {},
-        )
-        for row in rows
-    ]
-    builder = InlineKeyboardBuilder()
-    builder.button(text="📊 Stats", callback_data="home:stats")
-    builder.button(text="🏠 Home", callback_data="home:menu")
-    builder.adjust(2)
-    await message.answer(
-        format_postmortem(build_postmortem(records)),
-        parse_mode="HTML", reply_markup=builder.as_markup(),
-    )
 
 
 # /scan
@@ -1043,18 +1021,7 @@ async def cmd_scan(message: Message):
     await msg.edit_text(result_text, parse_mode="HTML", reply_markup=_menu_markup())
 
 
-# Instrument browser
-@router.message(Command("symbols"))
-async def cmd_symbols(message: Message):
-    if not await _check_owner(message): return
-    builder = InlineKeyboardBuilder()
-    for category in CATEGORIES:
-        builder.button(text=category, callback_data=f"cat:{category}")
-    builder.button(text="🏠 Home", callback_data="home:menu")
-    builder.adjust(2)
-    await message.answer("🔎 <b>Instruments</b>\n\nChoose a market category:", parse_mode="HTML", reply_markup=builder.as_markup())
-
-
+# Instrument browser (opened from the Add Symbol button)
 @router.callback_query(F.data.startswith("cat:"))
 async def cb_category(callback: CallbackQuery):
     if not _is_owner(callback.from_user.id):

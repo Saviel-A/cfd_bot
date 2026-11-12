@@ -32,7 +32,8 @@ Usage:
   .venv/bin/python scripts/backtest.py                  # default symbols
   .venv/bin/python scripts/backtest.py XAUUSD EURUSD    # your picks
 
-Price history comes from Yahoo by default. To test on your broker's own
+Price history comes from Yahoo by default; gold comes from Twelve Data
+spot prices when TWELVE_DATA_API_KEY is set in the environment. To test on your broker's own
 prices (the real CFD feed), export bars from MetaTrader 5
 (View > Symbols > Bars > Export Bars) at the entry timeframe or finer
 (M15 for gold, H1 for the rest), save them as <folder>/XAUUSD.csv,
@@ -61,6 +62,7 @@ from src import signal_engine as v2  # noqa: E402
 from src.risk_manager import calculate_trade  # noqa: E402
 from src.regime import classify_regime, regime_block_reason  # noqa: E402
 from src.history import find_history_file, load_history_file, resample_ohlcv  # noqa: E402
+from src import twelvedata  # noqa: E402
 
 YF_TICKERS = {
     "XAUUSD": "GC=F",
@@ -246,6 +248,9 @@ def load_candles(symbol: str, profile: dict) -> pd.DataFrame:
         return resample_ohlcv(load_history_file(path), profile["interval"])
 
     ticker = YF_TICKERS.get(symbol, symbol)
+    if twelvedata.supports(ticker, profile["interval"]):
+        # Spot prices, the same source the live bot uses when the key is set.
+        return twelvedata.fetch_candles(ticker, profile["interval"], twelvedata.MAX_OUTPUT)
     raw = yf.download(
         ticker,
         period=profile["period"],

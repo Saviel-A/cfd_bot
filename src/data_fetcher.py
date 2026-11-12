@@ -1,15 +1,21 @@
 """
 Data Fetcher – downloads OHLCV candle data from Yahoo Finance.
-Supports any yfinance ticker symbol.
+Supports any yfinance ticker symbol. Gold comes from Twelve Data spot
+prices instead when TWELVE_DATA_API_KEY is set (see src/twelvedata.py).
 """
 
 import ssl
 import json
+import logging
 import urllib.request
 from datetime import datetime, timezone, timedelta
 
 import yfinance as yf
 import pandas as pd
+
+from src import twelvedata
+
+logger = logging.getLogger(__name__)
 
 _SSL_CTX = ssl._create_unverified_context()
 
@@ -138,16 +144,8 @@ def _drop_incomplete_candle(df: pd.DataFrame, timeframe: str) -> pd.DataFrame:
     return df
 
 
-def fetch_ohlcv(ticker: str, timeframe: str = "1h", lookback: int = 200) -> pd.DataFrame:
-    """
-    Fetch OHLCV data for a ticker.
-
-    Returns a DataFrame with columns: open, high, low, close, volume
-    Index is DatetimeIndex (UTC).
-    """
-    if timeframe not in TIMEFRAME_MAP:
-        raise ValueError(f"Unsupported timeframe '{timeframe}'. Choose from: {list(TIMEFRAME_MAP)}")
-
+def _yahoo_candles(ticker: str, timeframe: str) -> pd.DataFrame:
+    """Raw candles from Yahoo at the timeframe's download interval."""
     params = TIMEFRAME_MAP[timeframe]
 
     try:
@@ -170,6 +168,30 @@ def fetch_ohlcv(ticker: str, timeframe: str = "1h", lookback: int = 200) -> pd.D
 
     df = raw.copy()
     df.columns = [c.lower() for c in df.columns]
+    return df
+
+
+def fetch_ohlcv(ticker: str, timeframe: str = "1h", lookback: int = 200) -> pd.DataFrame:
+    """
+    Fetch OHLCV data for a ticker.
+
+    Returns a DataFrame with columns: open, high, low, close, volume
+    Index is DatetimeIndex (UTC).
+    """
+    if timeframe not in TIMEFRAME_MAP:
+        raise ValueError(f"Unsupported timeframe '{timeframe}'. Choose from: {list(TIMEFRAME_MAP)}")
+
+    df = None
+    if twelvedata.supports(ticker, timeframe):
+        try:
+            bars = lookback * 4 + 8 if timeframe == "4h" else lookback + 5
+            df = twelvedata.fetch_candles(ticker, timeframe, bars)
+        except Exception as e:
+            # Never lose a scan to the optional source: fall back to Yahoo.
+            logger.warning(f"Twelve Data failed for {ticker} {timeframe}, using Yahoo: {e}")
+
+    if df is None:
+        df = _yahoo_candles(ticker, timeframe)
 
     # Resample to 4h if requested
     if timeframe == "4h":
