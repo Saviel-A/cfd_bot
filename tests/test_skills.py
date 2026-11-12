@@ -251,3 +251,39 @@ def test_postmortem_factor_breakdown_respects_direction():
     assert names["Momentum confirmed"].wins == 1
     assert names["Momentum absent"].wins == 0
     assert names["RSI zone confirmed"].trades == 1
+
+
+# history files
+
+def test_reads_mt5_export_and_resamples(tmp_path):
+    from src.history import find_history_file, load_history_file, resample_ohlcv
+
+    rows = ["<DATE>\t<TIME>\t<OPEN>\t<HIGH>\t<LOW>\t<CLOSE>\t<TICKVOL>\t<VOL>\t<SPREAD>"]
+    for k in range(8):
+        price = 2000 + k
+        rows.append(f"2026.01.05\t{10 + k // 4:02d}:{15 * (k % 4):02d}:00\t{price}\t{price + 2}\t{price - 1}\t{price + 1}\t100\t0\t20")
+    (tmp_path / "XAUUSD_M15.csv").write_text("\n".join(rows))
+
+    path = find_history_file(tmp_path, "xauusd")
+    df = load_history_file(path)
+    assert len(df) == 8
+    assert str(df.index.tz) == "UTC"
+    assert df["volume"].iloc[0] == 100
+
+    hourly = resample_ohlcv(df, "1h")
+    assert len(hourly) == 2
+    first = hourly.iloc[0]
+    assert (first["open"], first["high"], first["low"], first["close"]) == (2000, 2005, 1999, 2004)
+    assert first["volume"] == 400
+
+
+def test_reads_plain_csv_and_reports_missing_files(tmp_path):
+    from src.history import find_history_file, load_history_file
+
+    (tmp_path / "EURUSD.csv").write_text(
+        "time,open,high,low,close\n2026-01-05 10:00,1.1,1.2,1.0,1.15\n2026-01-05 11:00,1.15,1.3,1.1,1.2\n"
+    )
+    df = load_history_file(tmp_path / "EURUSD.csv")
+    assert list(df["close"]) == [1.15, 1.2]
+    assert find_history_file(tmp_path, "GBPUSD") is None
+    assert find_history_file(tmp_path / "nope", "EURUSD") is None

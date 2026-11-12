@@ -22,9 +22,22 @@ Honesty checks built in:
     and each is reported separately. An edge that lives in one period
     and dies in the rest is a curve fit, not an edge.
 
+  - Robustness: the same entries are replayed with the stop and the
+    target moved 25% either way and with double costs. A real edge is
+    a plateau; one that needs exact settings is a curve fit.
+  - Verdict: a short pass/fail checklist (enough trades, positive
+    after costs, holds across time, survives the stress variants).
+
 Usage:
   .venv/bin/python scripts/backtest.py                  # default symbols
   .venv/bin/python scripts/backtest.py XAUUSD EURUSD    # your picks
+
+Price history comes from Yahoo by default. To test on your broker's own
+prices (the real CFD feed), export bars from MetaTrader 5
+(View > Symbols > Bars > Export Bars) at the entry timeframe or finer
+(M15 for gold, H1 for the rest), save them as <folder>/XAUUSD.csv,
+<folder>/EURUSD.csv ... and run:
+  DATA_DIR=<folder> .venv/bin/python scripts/backtest.py XAUUSD EURUSD
 
 Experiments (environment variables, v2 engine only):
   REGIME_GATE=1   skip entries in range / quiet / shock regimes
@@ -47,6 +60,7 @@ from src.indicators import compute_all  # noqa: E402
 from src import signal_engine as v2  # noqa: E402
 from src.risk_manager import calculate_trade  # noqa: E402
 from src.regime import classify_regime, regime_block_reason  # noqa: E402
+from src.history import find_history_file, load_history_file, resample_ohlcv  # noqa: E402
 
 YF_TICKERS = {
     "XAUUSD": "GC=F",
@@ -78,6 +92,19 @@ COST_R = float(os.getenv("COST_R", "0.05"))
 REGIME_GATE = os.getenv("REGIME_GATE", "0") == "1"
 BE_AT_R = float(os.getenv("BE_AT_R", "0"))   # 0 = breakeven stop off
 FOLDS = max(1, int(os.getenv("FOLDS", "4")))
+DATA_DIR = os.getenv("DATA_DIR", "")
+
+# Robustness variants: (label, stop multiplier, target multiplier, cost multiplier)
+STRESS = [
+    ("baseline", 1.0, 1.0, 1.0),
+    ("stop 25% tighter", 0.75, 1.0, 1.0),
+    ("stop 25% wider", 1.25, 1.0, 1.0),
+    ("target 20% closer", 1.0, 0.8, 1.0),
+    ("target 20% farther", 1.0, 1.2, 1.0),
+    ("double costs", 1.0, 1.0, 2.0),
+]
+MIN_TRADES = 30
+GOOD_TRADES = 100
 RISK_LEGACY = {"sl_atr_multiplier": 1.5, "rr1": 2.0, "sl_min": 12, "sl_max": 16}
 
 
@@ -166,21 +193,30 @@ def fold_stats(trades: list[tuple[pd.Timestamp, float]], folds: int) -> list[Sta
 
 def simulate(
     df: pd.DataFrame, i: int, direction: str, symbol: str, risk_cfg: dict,
-    be_at_r: float = 0.0,
+    be_at_r: float = 0.0, stop_mult: float = 1.0, target_mult: float = 1.0,
 ) -> float | None:
     """Enter at candle i's close; walk forward to TP or SL. SL wins ties.
 
     With be_at_r > 0 the stop moves to entry once a candle has closed
     that far in profit; a later return to entry is a 0R scratch.
+    stop_mult / target_mult move the stop and the target away from
+    where the risk manager put them, for robustness checks. The result
+    is in R of the stop actually used.
     """
     entry = float(df["close"].iloc[i])
     atr = float(df["atr"].iloc[i])
     trade = calculate_trade(direction, entry, atr, risk_cfg, symbol=symbol)
     if trade is None:
         return None
-    rr = float(risk_cfg.get("rr1", 2.0))
+    side = 1 if direction == "BUY" else -1
+    sl_dist = trade.sl_distance * stop_mult
+    tp_dist = abs(trade.tp - trade.entry_price) * target_mult
+    if sl_dist <= 0 or tp_dist <= 0:
+        return None
+    rr = tp_dist / sl_dist
+    stop = entry - side * sl_dist
+    target = entry + side * tp_dist
 
-    stop = trade.stop_loss
     stop_r = -1.0
     for j in range(i + 1, min(i + 1 + MAX_HOLD, len(df))):
         high = float(df["high"].iloc[j])
@@ -189,23 +225,27 @@ def simulate(
         if direction == "BUY":
             if low <= stop:
                 return stop_r
-            if high >= trade.tp:
+            if high >= target:
                 return rr
-            in_profit = close - entry
         else:
             if high >= stop:
                 return stop_r
-            if low <= trade.tp:
+            if low <= target:
                 return rr
-            in_profit = entry - close
-        if be_at_r > 0 and stop_r < 0 and in_profit >= be_at_r * trade.sl_distance:
+        if be_at_r > 0 and stop_r < 0 and side * (close - entry) >= be_at_r * sl_dist:
             stop, stop_r = entry, 0.0
     return None  # never resolved inside the window
 
 
-def run_symbol(symbol: str) -> tuple[Stats, Stats, list[tuple[pd.Timestamp, float]]]:
+def load_candles(symbol: str, profile: dict) -> pd.DataFrame:
+    """Entry-timeframe candles from DATA_DIR when set, otherwise Yahoo."""
+    if DATA_DIR:
+        path = find_history_file(DATA_DIR, symbol)
+        if path is None:
+            raise RuntimeError(f"no file for {symbol} in {DATA_DIR}")
+        return resample_ohlcv(load_history_file(path), profile["interval"])
+
     ticker = YF_TICKERS.get(symbol, symbol)
-    profile = PROFILES.get(symbol.upper(), DEFAULT_PROFILE)
     raw = yf.download(
         ticker,
         period=profile["period"],
@@ -219,6 +259,14 @@ def run_symbol(symbol: str) -> tuple[Stats, Stats, list[tuple[pd.Timestamp, floa
         raw.columns = [c[0].lower() for c in raw.columns]
     else:
         raw.columns = [c.lower() for c in raw.columns]
+    return raw
+
+
+def run_symbol(symbol: str) -> tuple[Stats, Stats, list[tuple[pd.Timestamp, float]], dict[str, Stats]]:
+    profile = PROFILES.get(symbol.upper(), DEFAULT_PROFILE)
+    raw = load_candles(symbol, profile)
+    if len(raw) <= WARMUP + 1:
+        raise RuntimeError(f"only {len(raw)} candles for {symbol}, need more than {WARMUP}")
     df = compute_all(raw, INSTRUMENT_CFG)
 
     htf_raw = raw.resample(profile["htf"]).agg(
@@ -227,6 +275,7 @@ def run_symbol(symbol: str) -> tuple[Stats, Stats, list[tuple[pd.Timestamp, floa
 
     legacy, modern = Stats(), Stats()
     v2_trades: list[tuple[pd.Timestamp, float]] = []
+    v2_entries: list[tuple[int, str]] = []
     open_until = {"legacy": 0, "v2": 0}
 
     for i in range(WARMUP, len(df) - 1):
@@ -249,36 +298,72 @@ def run_symbol(symbol: str) -> tuple[Stats, Stats, list[tuple[pd.Timestamp, floa
                 if r is not None:
                     v2_trades.append((df.index[i], r))
                 modern.record(r, cost=COST_R)
+                v2_entries.append((i, sig.direction))
                 open_until["v2"] = i + 6
 
-    return legacy, modern, v2_trades
+    # Replay the same entries under each stress variant.
+    stress = {label: Stats() for label, *_ in STRESS}
+    for label, stop_mult, target_mult, cost_mult in STRESS:
+        for i, direction in v2_entries:
+            stress[label].record(
+                simulate(df, i, direction, symbol, RISK_V2, be_at_r=BE_AT_R,
+                         stop_mult=stop_mult, target_mult=target_mult),
+                cost=COST_R * cost_mult,
+            )
+
+    return legacy, modern, v2_trades, stress
+
+
+def merge(total: Stats, stats: Stats) -> None:
+    total.trades += stats.trades
+    total.wins += stats.wins
+    total.losses += stats.losses
+    total.scratches += stats.scratches
+    total.unresolved += stats.unresolved
+    total.r_total += stats.r_total
+
+
+def verdict(v2: Stats, folds: list[Stats], stress: dict[str, Stats]) -> list[tuple[bool, str]]:
+    """Pass/fail checks a result must clear before it is believed."""
+    resolved = v2.wins + v2.losses + v2.scratches
+    positive_folds = sum(1 for f in folds if f.expectancy > 0)
+    variants = [s for label, s in stress.items() if label != "baseline"]
+    surviving = sum(1 for s in variants if s.expectancy > 0)
+    return [
+        (resolved >= MIN_TRADES,
+         f"sample size: {resolved} resolved trades (minimum {MIN_TRADES}, {GOOD_TRADES}+ to trust it)"),
+        (v2.expectancy > 0,
+         f"positive after costs: {v2.expectancy:+.2f}R per trade"),
+        (bool(folds) and positive_folds > len(folds) / 2,
+         f"holds across time: {positive_folds}/{len(folds)} periods profitable"),
+        (bool(variants) and surviving == len(variants),
+         f"survives stress: {surviving}/{len(variants)} variants still profitable"),
+    ]
 
 
 def main() -> None:
     symbols = sys.argv[1:] or DEFAULT_SYMBOLS
     print(
         f"v2 settings: cost {COST_R}R per trade, regime gate {'on' if REGIME_GATE else 'off'}, "
-        f"breakeven stop {'at ' + str(BE_AT_R) + 'R' if BE_AT_R > 0 else 'off'}"
+        f"breakeven stop {'at ' + str(BE_AT_R) + 'R' if BE_AT_R > 0 else 'off'}, "
+        f"prices from {DATA_DIR or 'Yahoo'}"
     )
     print(f"{'symbol':<8} {'engine':<7} {'trades':>6} {'wins':>5} {'losses':>6} {'win%':>6} {'sumR':>7} {'exp/R':>6}")
     print("-" * 56)
     totals = {"legacy": Stats(), "v2": Stats()}
     all_v2_trades: list[tuple[pd.Timestamp, float]] = []
+    stress_totals = {label: Stats() for label, *_ in STRESS}
     for symbol in symbols:
         try:
-            legacy, modern, v2_trades = run_symbol(symbol)
+            legacy, modern, v2_trades, stress = run_symbol(symbol)
         except Exception as exc:  # noqa: BLE001 - report and continue
             print(f"{symbol:<8} skipped: {exc}")
             continue
         all_v2_trades.extend(v2_trades)
+        for label, stats in stress.items():
+            merge(stress_totals[label], stats)
         for name, stats in (("legacy", legacy), ("v2", modern)):
-            total = totals[name]
-            total.trades += stats.trades
-            total.wins += stats.wins
-            total.losses += stats.losses
-            total.scratches += stats.scratches
-            total.unresolved += stats.unresolved
-            total.r_total += stats.r_total
+            merge(totals[name], stats)
             print(
                 f"{symbol:<8} {name:<7} {stats.trades:>6} {stats.wins:>5} {stats.losses:>6} "
                 f"{stats.winrate:>5.1f}% {stats.r_total:>+7.1f} {stats.expectancy:>+6.2f}"
@@ -301,8 +386,25 @@ def main() -> None:
             )
         positive = sum(1 for stats in folds if stats.expectancy > 0)
         print(f"  profitable periods: {positive}/{len(folds)}")
-        if positive < len(folds) / 2:
-            print("  warning: the edge does not hold across time; treat the total with suspicion")
+
+    if totals["v2"].trades:
+        print()
+        print("Robustness, v2 (same entries, settings moved)")
+        for label, stats in stress_totals.items():
+            print(
+                f"  {label:<20} {stats.winrate:>5.1f}% win  "
+                f"{stats.r_total:>+7.1f}R  {stats.expectancy:>+5.2f}R each"
+            )
+
+        print()
+        print("Verdict")
+        checks = verdict(totals["v2"], folds, stress_totals)
+        for ok, text in checks:
+            print(f"  {'PASS' if ok else 'FAIL'}  {text}")
+        if all(ok for ok, _ in checks):
+            print("  All checks pass. This is evidence, not a guarantee.")
+        else:
+            print("  Do not rely on this result until every check passes.")
 
 
 if __name__ == "__main__":

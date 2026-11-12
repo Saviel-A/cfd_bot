@@ -66,6 +66,7 @@ cfd_bot/
     ├── risk_guard.py            # Circuit breaker (losing streak / daily loss) + correlation guard
     ├── regime.py                # Market regime: Hurst exponent, volatility percentile, ADX
     ├── data_quality.py          # Candle feed sanity checks before a signal is trusted
+    ├── history.py               # Reads MetaTrader 5 bar exports / CSV price history for the backtest
     ├── postmortem.py            # Closed-signal breakdown in R + Kelly risk suggestion (/postmortem)
     ├── trading_hours.py         # Market open/closed status per symbol
     └── calendar.py              # Forex Factory calendar: blocks alerts around high-impact news
@@ -117,7 +118,7 @@ All logic lives in pure modules under `src/` and is covered by `tests/` (`python
 | Data quality check | always on | Frozen, missing, inconsistent or bad-tick candles turn the scan into a HOLD |
 | Regime gate | off (`REGIME_GATE`) | Skips entries in range / quiet / shock regimes. It changes which entries fire, so prove it with the backtest first |
 | `/postmortem` | owner command | Win rate and expectancy in R by symbol, direction, confluence, session and factor, plus a quarter-Kelly risk suggestion |
-| `scripts/backtest.py` | manual | Now charges a cost per trade (`COST_R`), reports walk-forward periods (`FOLDS`), and can test the regime gate (`REGIME_GATE=1`) and a breakeven stop (`BE_AT_R=1.0`) |
+| `scripts/backtest.py` | manual | Charges a cost per trade (`COST_R`), reports walk-forward periods (`FOLDS`), replays entries with stop/target moved and costs doubled, and prints a pass/fail verdict. `DATA_DIR=<folder>` runs it on MetaTrader 5 bar exports (`XAUUSD.csv`, ...) instead of Yahoo. Can test the regime gate (`REGIME_GATE=1`) and a breakeven stop (`BE_AT_R=1.0`) |
 
 ## Environment Variables (.env)
 
