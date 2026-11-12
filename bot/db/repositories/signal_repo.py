@@ -119,6 +119,19 @@ async def get_signal_stats(session: AsyncSession, limit: int = 100) -> dict:
     }
 
 
+async def get_closed_signals(
+    session: AsyncSession,
+    since: datetime | None = None,
+    limit: int = 500,
+) -> list[Signal]:
+    """Signals that ended in TP or SL, newest close first."""
+    query = select(Signal).where(Signal.outcome.in_(FINAL_OUTCOMES))
+    if since is not None:
+        query = query.where(Signal.outcome_at >= since)
+    result = await session.execute(query.order_by(Signal.outcome_at.desc()).limit(limit))
+    return result.scalars().all()
+
+
 async def clear_all_signals(session: AsyncSession) -> int:
     result = await session.execute(delete(Signal))
     await session.commit()

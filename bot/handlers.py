@@ -17,7 +17,9 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from bot.db.session import AsyncSessionLocal
 from bot.db.repositories.user_repo import get_or_create_user, grant_premium_until
 from bot.db.repositories.watchlist_repo import get_watchlist, add_symbol, remove_symbol
-from bot.db.repositories.signal_repo import get_recent_signals, get_signal_stats, clear_all_signals
+from bot.db.repositories.signal_repo import (
+    get_recent_signals, get_signal_stats, clear_all_signals, get_closed_signals,
+)
 from bot.formatter import (
     format_signal_message, format_hold_message, format_watchlist_message,
     format_history_message, format_stats_message, format_market_closed_message,
@@ -31,6 +33,8 @@ from src.trading_hours import get_hours_message, symbol_market_status
 from src.calendar import get_calendar, format_calendar_message
 from bot.config import cfg, RISK_CFG, COUNTER_TREND_RISK_CFG
 from src.chart import generate_chart
+from src.postmortem import TradeRecord, build_postmortem, format_postmortem
+from src.risk_guard import trade_r
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -146,6 +150,7 @@ def _commands_text(name: str) -> str:
         "/chart XAUUSD - Chart\n\n"
         "📊 <b>Stats</b>\n"
         "/stats - Stats\n"
+        "/postmortem - Where The Edge Comes From\n"
         "/history - Recent Alerts\n\n"
         "📋 <b>Watchlist</b>\n"
         "/watchlist - Watchlist\n"
@@ -1116,6 +1121,34 @@ async def cmd_stats(message: Message):
     await message.answer(format_stats_message(stats), parse_mode="HTML", reply_markup=builder.as_markup())
 
 
+
+
+# /postmortem - breakdown of closed signals in R
+@router.message(Command("postmortem"))
+async def cmd_postmortem(message: Message):
+    if not await _check_owner(message): return
+    async with AsyncSessionLocal() as session:
+        rows = await get_closed_signals(session, limit=500)
+    records = [
+        TradeRecord(
+            symbol=row.symbol,
+            direction=row.direction,
+            outcome=row.outcome,
+            r=trade_r(row.outcome, row.entry_price, row.stop_loss, row.tp),
+            fired_at=row.fired_at,
+            strength=row.confluence_score,
+            votes=row.indicator_votes or {},
+        )
+        for row in rows
+    ]
+    builder = InlineKeyboardBuilder()
+    builder.button(text="📊 Stats", callback_data="home:stats")
+    builder.button(text="🏠 Home", callback_data="home:menu")
+    builder.adjust(2)
+    await message.answer(
+        format_postmortem(build_postmortem(records)),
+        parse_mode="HTML", reply_markup=builder.as_markup(),
+    )
 
 
 # /scan

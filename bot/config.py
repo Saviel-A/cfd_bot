@@ -31,6 +31,13 @@ class Config:
     ACCOUNT_BALANCE: float   = 10000
     RISK_PERCENT: float      = 1.5
 
+    # Risk guards above the engine. They only ever remove alerts.
+    CIRCUIT_BREAKER: bool    = os.getenv("CIRCUIT_BREAKER", "1") == "1"    # pause after losing streaks / a -4R day
+    CORRELATION_GUARD: bool  = os.getenv("CORRELATION_GUARD", "1") == "1"  # no second alert on the same bet
+    # Regime gate changes which entries fire, so it stays off until
+    # scripts/backtest.py (REGIME_GATE=1) shows it helps on real history.
+    REGIME_GATE: bool        = os.getenv("REGIME_GATE", "0") == "1"
+
 
 cfg = Config()
 

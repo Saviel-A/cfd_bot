@@ -60,6 +60,7 @@ async def main():
         BotCommand(command="scan", description="Scan Channel"),
         BotCommand(command="chart", description="Chart"),
         BotCommand(command="stats", description="Stats"),
+        BotCommand(command="postmortem", description="Edge Breakdown"),
         BotCommand(command="history", description="Recent Alerts"),
         BotCommand(command="watchlist", description="Watchlist"),
         BotCommand(command="symbols", description="Instruments"),

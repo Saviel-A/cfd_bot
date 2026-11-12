@@ -11,7 +11,10 @@ from zoneinfo import ZoneInfo
 from bot.config import cfg, SIGNAL_CFG, RISK_CFG, COUNTER_TREND_RISK_CFG
 from bot.db.session import AsyncSessionLocal
 from bot.db.repositories.watchlist_repo import get_watchlist
-from bot.db.repositories.signal_repo import get_active_signal_for_symbol, get_last_signal_for_symbol, save_signal
+from bot.db.repositories.signal_repo import (
+    get_active_signal_for_symbol, get_last_signal_for_symbol, save_signal,
+    get_closed_signals, get_open_signals,
+)
 from bot.formatter import format_signal_message, format_market_closed_message
 from src.instruments import load_instrument_cfg, get_display_name
 from src.data_fetcher import fetch_ohlcv, get_live_price
@@ -24,6 +27,11 @@ from src.calendar import check_news_risk
 from src.trading_hours import _is_open, symbol_market_status
 from src.signal_profiles import signal_profile, stale_candle_reason
 from src.gold_strategy import apply_gold_momentum
+from src.data_quality import ohlcv_quality_issue
+from src.regime import classify_regime, regime_block_reason
+from src.risk_guard import (
+    ClosedTrade, trade_r, circuit_breaker_reason, correlated_exposure_reason,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -170,11 +178,22 @@ async def scan_symbol(symbol: str) -> dict | None:
             entry_label=profile["entry_label"],
         )
         stale_reason = stale_candle_reason(df, profile["entry_timeframe"], symbol)
+        quality_issue = ohlcv_quality_issue(df)
         if stale_reason:
             signal.direction = "HOLD"
             signal.reason = stale_reason
+        elif quality_issue:
+            signal.direction = "HOLD"
+            signal.reason = f"{symbol} candle feed unreliable: {quality_issue}"
         pressure = analyze_market_pressure(df)
+        regime = classify_regime(df)
         apply_gold_momentum(symbol, signal, pressure)
+
+        if cfg.REGIME_GATE and signal.direction in ("BUY", "SELL"):
+            regime_reason = regime_block_reason(regime)
+            if regime_reason:
+                signal.reason = f"{signal.direction} blocked: {regime_reason}"
+                signal.direction = "HOLD"
 
         if signal.direction in ("BUY", "SELL") and should_block_by_pressure(symbol, signal, pressure):
             if signal.is_counter_trend and symbol.upper() in {"XAUUSD", "GOLD"}:
@@ -197,6 +216,7 @@ async def scan_symbol(symbol: str) -> dict | None:
                     "trade":           None,
                     "atr":             atr,
                     "market_pressure": pressure.as_dict(),
+                    "regime": regime.as_dict(),
                     "display_name":    get_display_name(symbol),
                 }
 
@@ -211,6 +231,7 @@ async def scan_symbol(symbol: str) -> dict | None:
                     "trade":        None,
                     "atr":          atr,
                     "market_pressure": pressure.as_dict(),
+                    "regime": regime.as_dict(),
                     "display_name": get_display_name(symbol),
                 }
 
@@ -231,6 +252,7 @@ async def scan_symbol(symbol: str) -> dict | None:
                             "trade":           None,
                             "atr":             atr,
                             "market_pressure": pressure.as_dict(),
+                            "regime": regime.as_dict(),
                             "display_name":    get_display_name(symbol),
                         }
 
@@ -247,6 +269,7 @@ async def scan_symbol(symbol: str) -> dict | None:
             "trade":        trade,
             "atr":          atr,
             "market_pressure": pressure.as_dict(),
+            "regime": regime.as_dict(),
             "display_name": get_display_name(symbol),
         }
     except Exception as e:
@@ -381,6 +404,48 @@ async def _open_trade_suppression_reason(symbol: str) -> str | None:
         return f"{active.direction} trade still open. Waiting for TP or SL"
 
 
+async def _circuit_breaker_suppression_reason(symbol: str) -> str | None:
+    """Pause new alerts after a losing streak on the symbol or a heavy losing day."""
+    if not cfg.CIRCUIT_BREAKER:
+        return None
+    async with AsyncSessionLocal() as session:
+        rows = await get_closed_signals(session, limit=200)
+    closed = [
+        ClosedTrade(
+            symbol=row.symbol,
+            outcome=row.outcome,
+            closed_at=row.outcome_at or row.fired_at,
+            r=trade_r(row.outcome, row.entry_price, row.stop_loss, row.tp),
+        )
+        for row in rows
+        if (row.outcome_at or row.fired_at) is not None
+    ]
+    return circuit_breaker_reason(symbol, closed)
+
+
+async def _correlation_suppression_reason(symbol: str, direction: str) -> str | None:
+    """Block a signal that repeats an open trade on a correlated symbol."""
+    if not cfg.CORRELATION_GUARD:
+        return None
+    async with AsyncSessionLocal() as session:
+        open_signals = await get_open_signals(session)
+    open_positions = [(s.symbol, s.direction) for s in open_signals if s.symbol != symbol]
+    if not open_positions:
+        return None
+
+    closes = {}
+    for name in {symbol, *(other for other, _ in open_positions)}:
+        try:
+            ticker = load_instrument_cfg(name).get("ticker", name)
+            df = await _fetch(ticker, "1h", lookback=200)
+            if df is not None and not df.empty:
+                closes[name] = df["close"]
+        except Exception as e:
+            # A guard that cannot get data must not stop the scan.
+            logger.warning(f"Correlation guard: no data for {name}: {e}")
+    return correlated_exposure_reason(symbol, direction, open_positions, closes)
+
+
 async def _prepare_live_trade(symbol: str, result: dict) -> tuple[float | None, object | None]:
     signal = result["signal"]
     trade = result["trade"]
@@ -450,6 +515,20 @@ async def broadcast_signal_if_allowed(
         if duplicate_reason:
             logger.info(f"{symbol}: {duplicate_reason}")
             return False, duplicate_reason
+
+        breaker_reason = await _circuit_breaker_suppression_reason(symbol)
+        if breaker_reason:
+            logger.info(f"{symbol}: {breaker_reason}")
+            return False, breaker_reason
+
+        correlation_reason = await _correlation_suppression_reason(symbol, signal.direction)
+        if correlation_reason:
+            logger.info(f"{symbol}: {correlation_reason}")
+            return False, correlation_reason
+
+    regime = result.get("regime") or {}
+    if regime:
+        logger.info(f"{symbol}: regime {regime.get('label')} - {regime.get('reason')}")
 
     live_price, trade = await _prepare_live_trade(symbol, result)
     result["live_price"] = live_price
@@ -574,7 +653,7 @@ async def run_scan_loop(bot, interval_minutes: int = 60):
                             if result["signal"].direction not in ("BUY", "SELL"):
                                 reason = result["signal"].reason or "No clean setup"
                                 logger.info(f"{symbol}: no signal - {reason}")
-                                if "stale" not in reason.lower():
+                                if "candle feed" not in reason.lower():
                                     await _send_proximity_alert(bot, symbol, result)
                                 continue
 

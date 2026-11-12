@@ -65,6 +65,10 @@ cfd_bot/
     ├── indicators.py            # EMA, RSI, MACD, Bollinger, ATR
     ├── signal_engine.py         # Multi-timeframe confluence logic
     ├── risk_manager.py          # ATR-based SL/TP calculation
+    ├── risk_guard.py            # Circuit breaker (losing streak / daily loss) + correlation guard
+    ├── regime.py                # Market regime: Hurst exponent, volatility percentile, ADX
+    ├── data_quality.py          # Candle feed sanity checks before a signal is trusted
+    ├── postmortem.py            # Closed-signal breakdown in R + Kelly risk suggestion (/postmortem)
     ├── trading_hours.py         # Market session hours (Israel time)
     ├── calendar.py              # Forex Factory economic calendar
     └── news.py                  # yfinance news fetcher
@@ -102,6 +106,20 @@ Subscribe via Telegram Stars — receive a single-use channel invite link instan
 | TP1 / TP2 / TP3 | SL x 1.5 / 2.5 / 4.0 |
 
 Counter-trend signals are discarded. Signals only fire on closed candles.
+
+## Risk Guards And Research Tools
+
+Added from ideas in the tradermonty and agiprolabs `claude-trading-skills` repos.
+All logic lives in pure modules under `src/` and is covered by `tests/` (`python -m pytest tests`).
+
+| Piece | Default | What it does |
+|---|---|---|
+| Circuit breaker | on (`CIRCUIT_BREAKER`) | No new alert on a symbol for 6h after 3 stop losses in a row; no new alerts for the rest of the UTC day once the day is at -4R |
+| Correlation guard | on (`CORRELATION_GUARD`) | Skips an alert that is the same bet as an open trade (1H return correlation of 0.80 or more) |
+| Data quality check | always on | Frozen, missing, inconsistent or bad-tick candles turn the scan into a HOLD |
+| Regime gate | off (`REGIME_GATE`) | Skips entries in range / quiet / shock regimes. It changes which entries fire, so prove it with the backtest first |
+| `/postmortem` | owner command | Win rate and expectancy in R by symbol, direction, confluence, session and factor, plus a quarter-Kelly risk suggestion |
+| `scripts/backtest.py` | manual | Now charges a cost per trade (`COST_R`), reports walk-forward periods (`FOLDS`), and can test the regime gate (`REGIME_GATE=1`) and a breakeven stop (`BE_AT_R=1.0`) |
 
 ## Environment Variables (.env)
 
